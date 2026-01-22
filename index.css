@@ -1,0 +1,83 @@
+@layer base {
+  :root {
+    /* ===== Core Colors ===== */
+    --background: 180 25% 96%;
+    --foreground: 210 20% 18%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 20% 18%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 20% 18%;
+
+    /* ===== Brand ===== */
+    --primary: 188 55% 38%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 186 35% 85%;
+    --secondary-foreground: 210 20% 20%;
+
+    --accent: 190 45% 90%;
+    --accent-foreground: 210 20% 18%;
+
+    /* ===== Neutral ===== */
+    --muted: 210 16% 92%;
+    --muted-foreground: 210 12% 45%;
+
+    --border: 210 16% 88%;
+    --input: 210 16% 90%;
+    --ring: 188 55% 38%;
+
+    /* ===== Status ===== */
+    --success: 160 55% 40%;
+    --warning: 38 90% 55%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* ===== Radius ===== */
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 210 20% 10%;
+    --foreground: 0 0% 96%;
+
+    --card: 210 18% 14%;
+    --card-foreground: 0 0% 96%;
+
+    --popover: 210 18% 14%;
+    --popover-foreground: 0 0% 96%;
+
+    --primary: 188 55% 45%;
+    --primary-foreground: 210 20% 10%;
+
+    --secondary: 210 15% 22%;
+    --secondary-foreground: 0 0% 96%;
+
+    --accent: 210 15% 24%;
+    --accent-foreground: 0 0% 96%;
+
+    --muted: 210 15% 20%;
+    --muted-foreground: 210 10% 65%;
+
+    --border: 210 15% 24%;
+    --input: 210 15% 26%;
+    --ring: 188 55% 45%;
+
+    --success: 160 55% 45%;
+    --warning: 38 90% 60%;
+    --destructive: 0 70% 60%;
+    --destructive-foreground: 0 0% 100%;
+  }
+
+  /* ===== Base Reset ===== */
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
