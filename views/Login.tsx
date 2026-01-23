@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, Mail, ArrowRight, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { signIn } from '../services/supabaseService';
 
 interface LoginProps {
   onLogin: (user: { name: string; email: string }) => void;
@@ -18,34 +19,42 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setSuccessMessage('');
     setIsLoading(true);
 
-    // Simulate API delay
-    setTimeout(() => {
-      // Mock validation logic
-      // User: carmem@clareser.com.br
-      // Password: 123456
-      if (email === 'carmem@clareser.com.br' && password === '123456') {
+    try {
+      const user = await signIn(email, password);
+
+      if (user) {
         onLogin({
-          name: 'Dra. Carmem Lucia',
-          email: email
+          name: user.user_metadata?.name || email.split('@')[0],
+          email: user.email || email
         });
-      } else {
-        setError('E-mail ou senha incorretos. Tente novamente.');
-        setIsLoading(false);
       }
-    }, 1500);
+    } catch (err: any) {
+      console.error('Login error:', err);
+
+      // Translate common Supabase errors to Portuguese
+      if (err.message?.includes('Invalid login credentials')) {
+        setError('E-mail ou senha incorretos. Tente novamente.');
+      } else if (err.message?.includes('Email not confirmed')) {
+        setError('E-mail não confirmado. Verifique sua caixa de entrada.');
+      } else {
+        setError(err.message || 'Erro ao fazer login. Tente novamente.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleForgotPassword = (e: React.MouseEvent) => {
     e.preventDefault();
     setError('');
     setSuccessMessage('');
-    
+
     if (!email) {
       setError('Por favor, digite seu e-mail para recuperar a senha.');
       return;
     }
 
-    // Simulate sending email
+    // TODO: Implement password recovery with Supabase
     setSuccessMessage(`Enviamos as instruções de recuperação para ${email}. Verifique sua caixa de entrada.`);
   };
 
@@ -163,7 +172,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               </div>
 
               <div className="text-sm">
-                <button 
+                <button
                   type="button"
                   onClick={handleForgotPassword}
                   className="font-medium text-[#004D40] hover:text-[#00695C] border-0 bg-transparent p-0"

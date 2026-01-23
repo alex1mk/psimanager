@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { UploadCloud, FileText, Check, Loader2, DollarSign, Building, User, Plus, X, Calendar, Tag, Store, Save, FileCheck, Search, Mail, MessageCircle, Edit2, Trash, AlertTriangle } from 'lucide-react';
 import { Expense, ExpenseType, Appointment } from '../types';
-import { analyzeReceiptOCR, getExpenses, createExpense, updateExpense, deleteExpense, getAppointments } from '../services/mockService';
+import { analyzeReceiptOCR, getExpenses, createExpense, updateExpense, deleteExpense, getAppointments } from '../services/supabaseService';
 import { Alert } from '../components/ui/Alert';
 
 const Expenses: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [alert, setAlert] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const [alert, setAlert] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'ALL' | 'PF' | 'PJ'>('ALL');
-  
+
   // Manual Entry / Edit State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -46,12 +46,12 @@ const Expenses: React.FC = () => {
   const generateReceipt = async (app: Appointment, method: 'email' | 'whatsapp') => {
     setIsGeneratingReceipt(true);
     setTimeout(() => {
-        setAlert({ 
-            type: 'success', 
-            message: `Recibo gerado para ${app.patientName} e enviado via ${method === 'email' ? 'E-mail' : 'WhatsApp'}!` 
-        });
-        setIsGeneratingReceipt(false);
-        setIsReceiptModalOpen(false);
+      setAlert({
+        type: 'success',
+        message: `Recibo gerado para ${app.patientName} e enviado via ${method === 'email' ? 'E-mail' : 'WhatsApp'}!`
+      });
+      setIsGeneratingReceipt(false);
+      setIsReceiptModalOpen(false);
     }, 1500);
   };
 
@@ -64,7 +64,7 @@ const Expenses: React.FC = () => {
 
     try {
       const extractedData = await analyzeReceiptOCR(file);
-      
+
       const expense: Expense = {
         id: Math.random().toString(36).substr(2, 9),
         description: extractedData.description || 'Despesa sem descrição',
@@ -83,7 +83,7 @@ const Expenses: React.FC = () => {
       setAlert({ type: 'error', message: 'Falha ao analisar recibo.' });
     } finally {
       setIsUploading(false);
-      e.target.value = ''; 
+      e.target.value = '';
     }
   };
 
@@ -91,21 +91,21 @@ const Expenses: React.FC = () => {
   const handleOpenNew = () => {
     setIsEditing(false);
     setCurrentExpense({
-        description: '',
-        merchantName: '',
-        amount: 0,
-        date: new Date().toISOString().split('T')[0],
-        category: 'Geral',
-        type: ExpenseType.PJ
+      description: '',
+      merchantName: '',
+      amount: 0,
+      date: new Date().toISOString().split('T')[0],
+      category: 'Geral',
+      type: ExpenseType.PJ
     });
     setIsModalOpen(true);
   };
 
   // Open Modal for Editing
   const handleOpenEdit = (expense: Expense) => {
-      setIsEditing(true);
-      setCurrentExpense({ ...expense });
-      setIsModalOpen(true);
+    setIsEditing(true);
+    setCurrentExpense({ ...expense });
+    setIsModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -117,50 +117,50 @@ const Expenses: React.FC = () => {
 
     try {
       if (isEditing && currentExpense.id) {
-          // Update
-          const updated = await updateExpense(currentExpense as Expense);
-          setExpenses(prev => prev.map(e => e.id === updated.id ? updated : e));
-          setAlert({ type: 'success', message: 'Despesa atualizada com sucesso!' });
+        // Update
+        const updated = await updateExpense(currentExpense as Expense);
+        setExpenses(prev => prev.map(e => e.id === updated.id ? updated : e));
+        setAlert({ type: 'success', message: 'Despesa atualizada com sucesso!' });
       } else {
-          // Create
-          const expense: Expense = {
-            id: Math.random().toString(36).substr(2, 9),
-            description: currentExpense.description || '',
-            amount: Number(currentExpense.amount),
-            date: currentExpense.date || new Date().toISOString().split('T')[0],
-            category: currentExpense.category || 'Geral',
-            type: currentExpense.type || ExpenseType.PJ,
-            merchantName: currentExpense.merchantName,
-            receiptUrl: undefined
-          };
-          await createExpense(expense);
-          setExpenses(prev => [expense, ...prev]);
-          setAlert({ type: 'success', message: 'Despesa adicionada manualmente!' });
+        // Create
+        const expense: Expense = {
+          id: Math.random().toString(36).substr(2, 9),
+          description: currentExpense.description || '',
+          amount: Number(currentExpense.amount),
+          date: currentExpense.date || new Date().toISOString().split('T')[0],
+          category: currentExpense.category || 'Geral',
+          type: currentExpense.type || ExpenseType.PJ,
+          merchantName: currentExpense.merchantName,
+          receiptUrl: undefined
+        };
+        await createExpense(expense);
+        setExpenses(prev => [expense, ...prev]);
+        setAlert({ type: 'success', message: 'Despesa adicionada manualmente!' });
       }
 
       setIsModalOpen(false);
     } catch (error) {
-       setAlert({ type: 'error', message: 'Erro ao salvar despesa.' });
+      setAlert({ type: 'error', message: 'Erro ao salvar despesa.' });
     }
   };
 
   const handleDelete = (id: string) => {
-      setExpenseToDelete(id);
+    setExpenseToDelete(id);
   };
 
   const confirmDelete = async () => {
-      if (!expenseToDelete) return;
-      setIsDeleting(true);
-      try {
-          await deleteExpense(expenseToDelete);
-          setExpenses(prev => prev.filter(e => e.id !== expenseToDelete));
-          setAlert({ type: 'success', message: 'Despesa excluída com sucesso.' });
-      } catch (error) {
-          setAlert({ type: 'error', message: 'Erro ao excluir despesa.' });
-      } finally {
-          setIsDeleting(false);
-          setExpenseToDelete(null);
-      }
+    if (!expenseToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteExpense(expenseToDelete);
+      setExpenses(prev => prev.filter(e => e.id !== expenseToDelete));
+      setAlert({ type: 'success', message: 'Despesa excluída com sucesso.' });
+    } catch (error) {
+      setAlert({ type: 'error', message: 'Erro ao excluir despesa.' });
+    } finally {
+      setIsDeleting(false);
+      setExpenseToDelete(null);
+    }
   };
 
   const handleInputChange = (field: keyof Expense, value: any) => {
@@ -181,28 +181,28 @@ const Expenses: React.FC = () => {
           <p className="text-slate-500">Gestão financeira com OCR automático.</p>
         </div>
         <div className="flex gap-2">
-            <button 
-                onClick={handleOpenReceiptModal}
-                className="flex items-center gap-2 px-4 py-2 bg-white text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm transition-all"
-            >
-                <FileCheck size={18} />
-                Gerar Recibo
-            </button>
-            <button 
-                onClick={handleOpenNew}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 shadow-sm transition-all"
-            >
-                <Plus size={18} />
-                Nova Despesa
-            </button>
+          <button
+            onClick={handleOpenReceiptModal}
+            className="flex items-center gap-2 px-4 py-2 bg-white text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm transition-all"
+          >
+            <FileCheck size={18} />
+            Gerar Recibo
+          </button>
+          <button
+            onClick={handleOpenNew}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 shadow-sm transition-all"
+          >
+            <Plus size={18} />
+            Nova Despesa
+          </button>
         </div>
       </div>
 
       {alert && (
-        <Alert 
-          type={alert.type as any} 
-          message={alert.message} 
-          onClose={() => setAlert(null)} 
+        <Alert
+          type={alert.type as any}
+          message={alert.message}
+          onClose={() => setAlert(null)}
         />
       )}
 
@@ -225,14 +225,14 @@ const Expenses: React.FC = () => {
             </p>
           </div>
           <div className="relative mt-2">
-            <input 
-              type="file" 
+            <input
+              type="file"
               accept="image/*,application/pdf"
               onChange={handleFileUpload}
               disabled={isUploading}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
             />
-            <button 
+            <button
               disabled={isUploading}
               className="px-6 py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 transition-colors disabled:opacity-50"
             >
@@ -246,19 +246,19 @@ const Expenses: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-            <button 
+            <button
               onClick={() => setActiveTab('ALL')}
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'ALL' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
               Todas
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('PF')}
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'PF' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
               Pessoa Física (CPF)
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('PJ')}
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'PJ' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
@@ -294,7 +294,7 @@ const Expenses: React.FC = () => {
                   <td className="px-6 py-4">{new Date(expense.date).toLocaleDateString('pt-BR')}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1.5">
-                      {expense.type === ExpenseType.PJ ? <Building size={14} className="text-purple-500"/> : <User size={14} className="text-teal-500"/>}
+                      {expense.type === ExpenseType.PJ ? <Building size={14} className="text-purple-500" /> : <User size={14} className="text-teal-500" />}
                       <span>{expense.type === ExpenseType.PJ ? 'PJ' : 'PF'}</span>
                     </div>
                   </td>
@@ -303,32 +303,32 @@ const Expenses: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-center gap-2">
-                        {expense.receiptUrl && expense.receiptUrl !== '#' && (
+                      {expense.receiptUrl && expense.receiptUrl !== '#' && (
                         <button className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded transition-colors" title="Ver Recibo">
-                            <FileText size={16} />
+                          <FileText size={16} />
                         </button>
-                        )}
-                        <button 
-                            onClick={() => handleOpenEdit(expense)}
-                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" 
-                            title="Editar"
-                        >
-                            <Edit2 size={16} />
-                        </button>
-                        <button 
-                            onClick={() => handleDelete(expense.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" 
-                            title="Excluir"
-                        >
-                            <Trash size={16} />
-                        </button>
+                      )}
+                      <button
+                        onClick={() => handleOpenEdit(expense)}
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        title="Editar"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(expense.id)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Excluir"
+                      >
+                        <Trash size={16} />
+                      </button>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          
+
           {filteredExpenses.length === 0 && (
             <div className="p-8 text-center text-slate-500">
               Nenhuma despesa encontrada nesta categoria.
@@ -343,10 +343,10 @@ const Expenses: React.FC = () => {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden">
             <div className="bg-slate-50 p-4 border-b border-gray-100 flex justify-between items-center">
               <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                {isEditing ? <Edit2 size={20} className="text-teal-600"/> : <Plus size={20} className="text-teal-600"/>}
+                {isEditing ? <Edit2 size={20} className="text-teal-600" /> : <Plus size={20} className="text-teal-600" />}
                 {isEditing ? 'Editar Despesa' : 'Nova Despesa Manual'}
               </h3>
-              <button 
+              <button
                 onClick={() => setIsModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg p-1 transition-colors"
               >
@@ -355,148 +355,148 @@ const Expenses: React.FC = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Descrição */}
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Descrição do Item</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Tag className="h-5 w-5 text-slate-400" />
-                      </div>
-                      <input
-                        type="text"
-                        required
-                        value={currentExpense.description}
-                        onChange={(e) => handleInputChange('description', e.target.value)}
-                        className="bg-white pl-10 w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-slate-800"
-                        placeholder="Ex: Aluguel, Compra de material, Livros..."
-                      />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Descrição */}
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Descrição do Item</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Tag className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={currentExpense.description}
+                      onChange={(e) => handleInputChange('description', e.target.value)}
+                      className="bg-white pl-10 w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-slate-800"
+                      placeholder="Ex: Aluguel, Compra de material, Livros..."
+                    />
+                  </div>
+                </div>
+
+                {/* Estabelecimento */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Estabelecimento (Opcional)</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Store className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <input
+                      type="text"
+                      value={currentExpense.merchantName}
+                      onChange={(e) => handleInputChange('merchantName', e.target.value)}
+                      className="bg-white pl-10 w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-slate-800"
+                      placeholder="Ex: Livraria Saraiva"
+                    />
+                  </div>
+                </div>
+
+                {/* Valor */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Valor (R$)</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <DollarSign className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <input
+                      type="number"
+                      required
+                      step="0.01"
+                      min="0"
+                      value={currentExpense.amount}
+                      onChange={(e) => handleInputChange('amount', e.target.value)}
+                      className="bg-white pl-10 w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-slate-800"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                {/* Data */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      required
+                      value={currentExpense.date}
+                      onChange={(e) => handleInputChange('date', e.target.value)}
+                      className="bg-white w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-slate-800 pr-10 appearance-none relative z-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:top-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    />
+                    <div className="absolute top-1/2 right-3 -translate-y-1/2 pointer-events-none z-20 text-slate-500">
+                      <Calendar size={20} />
                     </div>
                   </div>
+                </div>
 
-                  {/* Estabelecimento */}
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Estabelecimento (Opcional)</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Store className="h-5 w-5 text-slate-400" />
-                      </div>
-                      <input
-                        type="text"
-                        value={currentExpense.merchantName}
-                        onChange={(e) => handleInputChange('merchantName', e.target.value)}
-                        className="bg-white pl-10 w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-slate-800"
-                        placeholder="Ex: Livraria Saraiva"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Valor */}
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Valor (R$)</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <DollarSign className="h-5 w-5 text-slate-400" />
-                      </div>
-                      <input
-                        type="number"
-                        required
-                        step="0.01"
-                        min="0"
-                        value={currentExpense.amount}
-                        onChange={(e) => handleInputChange('amount', e.target.value)}
-                        className="bg-white pl-10 w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-slate-800"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Data */}
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        required
-                        value={currentExpense.date}
-                        onChange={(e) => handleInputChange('date', e.target.value)}
-                        className="bg-white w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-slate-800 pr-10 appearance-none relative z-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:top-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                      />
-                      <div className="absolute top-1/2 right-3 -translate-y-1/2 pointer-events-none z-20 text-slate-500">
-                        <Calendar size={20} />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Categoria */}
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Categoria</label>
-                    <select
-                      value={currentExpense.category}
-                      onChange={(e) => handleInputChange('category', e.target.value)}
-                      className="bg-white w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-slate-800"
-                    >
-                      <option>Geral</option>
-                      <option>Infraestrutura</option>
-                      <option>Materiais</option>
-                      <option>Educação Continuada</option>
-                      <option>Transporte</option>
-                      <option>Alimentação</option>
-                      <option>Impostos</option>
-                    </select>
-                  </div>
-
-                  {/* Tipo (PF/PJ) */}
-                  <div className="col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Despesa (Contabilidade)</label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                           type="radio" 
-                           name="expenseType" 
-                           className="text-teal-600 focus:ring-teal-500 h-4 w-4"
-                           checked={currentExpense.type === ExpenseType.PJ}
-                           onChange={() => handleInputChange('type', ExpenseType.PJ)}
-                        />
-                        <span className="text-sm text-slate-700 flex items-center gap-1">
-                          <Building size={16} className="text-purple-500" />
-                          Pessoa Jurídica (CNPJ)
-                        </span>
-                      </label>
-
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                           type="radio" 
-                           name="expenseType" 
-                           className="text-teal-600 focus:ring-teal-500 h-4 w-4"
-                           checked={currentExpense.type === ExpenseType.PF}
-                           onChange={() => handleInputChange('type', ExpenseType.PF)}
-                        />
-                        <span className="text-sm text-slate-700 flex items-center gap-1">
-                          <User size={16} className="text-teal-500" />
-                          Pessoa Física (CPF)
-                        </span>
-                      </label>
-                    </div>
-                  </div>
-               </div>
-
-               <div className="flex gap-3 pt-4 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="flex-1 px-4 py-2 border border-gray-300 text-slate-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                {/* Categoria */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Categoria</label>
+                  <select
+                    value={currentExpense.category}
+                    onChange={(e) => handleInputChange('category', e.target.value)}
+                    className="bg-white w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-slate-800"
                   >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium transition-colors"
-                  >
-                    <Save size={18} />
-                    {isEditing ? 'Atualizar Despesa' : 'Salvar Despesa'}
-                  </button>
-               </div>
+                    <option>Geral</option>
+                    <option>Infraestrutura</option>
+                    <option>Materiais</option>
+                    <option>Educação Continuada</option>
+                    <option>Transporte</option>
+                    <option>Alimentação</option>
+                    <option>Impostos</option>
+                  </select>
+                </div>
+
+                {/* Tipo (PF/PJ) */}
+                <div className="col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Despesa (Contabilidade)</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="expenseType"
+                        className="text-teal-600 focus:ring-teal-500 h-4 w-4"
+                        checked={currentExpense.type === ExpenseType.PJ}
+                        onChange={() => handleInputChange('type', ExpenseType.PJ)}
+                      />
+                      <span className="text-sm text-slate-700 flex items-center gap-1">
+                        <Building size={16} className="text-purple-500" />
+                        Pessoa Jurídica (CNPJ)
+                      </span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="expenseType"
+                        className="text-teal-600 focus:ring-teal-500 h-4 w-4"
+                        checked={currentExpense.type === ExpenseType.PF}
+                        onChange={() => handleInputChange('type', ExpenseType.PF)}
+                      />
+                      <span className="text-sm text-slate-700 flex items-center gap-1">
+                        <User size={16} className="text-teal-500" />
+                        Pessoa Física (CPF)
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-slate-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium transition-colors"
+                >
+                  <Save size={18} />
+                  {isEditing ? 'Atualizar Despesa' : 'Salvar Despesa'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -506,41 +506,41 @@ const Expenses: React.FC = () => {
       {expenseToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-bounce-short">
-             <div className="p-6">
-                <div className="flex items-start gap-4 mb-4">
-                   <div className="bg-red-100 p-3 rounded-full flex-shrink-0">
-                      <AlertTriangle className="text-red-600 w-6 h-6" />
-                   </div>
-                   <div>
-                      <h3 className="text-lg font-bold text-slate-800">Confirmar Exclusão</h3>
-                      <p className="text-slate-500 text-sm mt-1">
-                         Tem certeza que deseja excluir esta despesa? Esta ação não pode ser desfeita.
-                      </p>
-                   </div>
+            <div className="p-6">
+              <div className="flex items-start gap-4 mb-4">
+                <div className="bg-red-100 p-3 rounded-full flex-shrink-0">
+                  <AlertTriangle className="text-red-600 w-6 h-6" />
                 </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">Confirmar Exclusão</h3>
+                  <p className="text-slate-500 text-sm mt-1">
+                    Tem certeza que deseja excluir esta despesa? Esta ação não pode ser desfeita.
+                  </p>
+                </div>
+              </div>
 
-                <div className="flex gap-3 mt-6">
-                   <button 
-                      onClick={() => setExpenseToDelete(null)}
-                      disabled={isDeleting}
-                      className="flex-1 px-4 py-2 border border-gray-300 text-slate-700 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50"
-                   >
-                      Cancelar
-                   </button>
-                   <button 
-                      onClick={confirmDelete}
-                      disabled={isDeleting}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors disabled:opacity-50"
-                   >
-                      {isDeleting ? (
-                        <>
-                          <Loader2 className="animate-spin w-4 h-4" />
-                          Excluindo...
-                        </>
-                      ) : 'Confirmar Exclusão'}
-                   </button>
-                </div>
-             </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setExpenseToDelete(null)}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-slate-700 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={isDeleting}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="animate-spin w-4 h-4" />
+                      Excluindo...
+                    </>
+                  ) : 'Confirmar Exclusão'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -551,10 +551,10 @@ const Expenses: React.FC = () => {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
             <div className="bg-slate-50 p-4 border-b border-gray-100 flex justify-between items-center">
               <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                <FileCheck size={20} className="text-teal-600"/>
+                <FileCheck size={20} className="text-teal-600" />
                 Gerar Recibo de Consulta
               </h3>
-              <button 
+              <button
                 onClick={() => setIsReceiptModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg p-1 transition-colors"
               >
@@ -563,55 +563,55 @@ const Expenses: React.FC = () => {
             </div>
 
             <div className="p-6">
-                <div className="relative mb-4">
-                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                   <input 
-                      type="text"
-                      placeholder="Buscar agendamento confirmado..."
-                      className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm"
-                   />
-                </div>
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Buscar agendamento confirmado..."
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
 
-                <div className="max-h-64 overflow-y-auto space-y-2 mb-4">
-                    {confirmableAppointments.length === 0 ? (
-                        <p className="text-center text-slate-500 py-4 text-sm">
-                            Nenhum agendamento confirmado disponível para emissão.
+              <div className="max-h-64 overflow-y-auto space-y-2 mb-4">
+                {confirmableAppointments.length === 0 ? (
+                  <p className="text-center text-slate-500 py-4 text-sm">
+                    Nenhum agendamento confirmado disponível para emissão.
+                  </p>
+                ) : (
+                  confirmableAppointments.map(app => (
+                    <div key={app.id} className="p-3 border border-gray-200 rounded-lg hover:bg-slate-50 flex justify-between items-center group">
+                      <div>
+                        <p className="font-medium text-slate-800 text-sm">{app.patientName}</p>
+                        <p className="text-xs text-slate-500">
+                          {new Date(app.date).toLocaleDateString('pt-BR')} às {app.time}
                         </p>
-                    ) : (
-                        confirmableAppointments.map(app => (
-                            <div key={app.id} className="p-3 border border-gray-200 rounded-lg hover:bg-slate-50 flex justify-between items-center group">
-                                <div>
-                                    <p className="font-medium text-slate-800 text-sm">{app.patientName}</p>
-                                    <p className="text-xs text-slate-500">
-                                        {new Date(app.date).toLocaleDateString('pt-BR')} às {app.time}
-                                    </p>
-                                </div>
-                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button 
-                                        onClick={() => generateReceipt(app, 'email')}
-                                        disabled={isGeneratingReceipt}
-                                        className="p-1.5 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
-                                        title="Gerar e enviar por E-mail"
-                                    >
-                                        <Mail size={16} />
-                                    </button>
-                                    <button 
-                                        onClick={() => generateReceipt(app, 'whatsapp')}
-                                        disabled={isGeneratingReceipt}
-                                        className="p-1.5 bg-green-100 text-green-600 rounded hover:bg-green-200"
-                                        title="Gerar e enviar por WhatsApp"
-                                    >
-                                        <MessageCircle size={16} />
-                                    </button>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
+                      </div>
+                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => generateReceipt(app, 'email')}
+                          disabled={isGeneratingReceipt}
+                          className="p-1.5 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
+                          title="Gerar e enviar por E-mail"
+                        >
+                          <Mail size={16} />
+                        </button>
+                        <button
+                          onClick={() => generateReceipt(app, 'whatsapp')}
+                          disabled={isGeneratingReceipt}
+                          className="p-1.5 bg-green-100 text-green-600 rounded hover:bg-green-200"
+                          title="Gerar e enviar por WhatsApp"
+                        >
+                          <MessageCircle size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
 
-                <div className="bg-yellow-50 p-3 rounded text-xs text-yellow-800 border border-yellow-200">
-                    <p>💡 Ao gerar o recibo, o sistema criará automaticamente um registro financeiro de "Entrada".</p>
-                </div>
+              <div className="bg-yellow-50 p-3 rounded text-xs text-yellow-800 border border-yellow-200">
+                <p>💡 Ao gerar o recibo, o sistema criará automaticamente um registro financeiro de "Entrada".</p>
+              </div>
             </div>
           </div>
         </div>

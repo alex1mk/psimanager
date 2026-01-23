@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Edit2, Trash, X, Save, User, Mail, Phone, Calendar, Clock, CreditCard, Loader2, AlertTriangle, MessageCircle, CheckCircle, FileSpreadsheet, Upload } from 'lucide-react';
 import { Patient, PaymentType, Appointment } from '../types';
-import { getPatients, createPatient, updatePatient, deletePatient, createAppointment, sendNotification } from '../services/mockService';
+import { getPatients, createPatient, updatePatient, deletePatient, createAppointment, sendNotification } from '../services/supabaseService';
 import { Alert } from '../components/ui/Alert';
 import ExcelJS from 'exceljs';
 
@@ -116,35 +116,42 @@ const Patients: React.FC = () => {
         setPatients(prev => prev.map(p => (p.id === updated.id ? updated : p)));
         setAlert({ type: 'success', message: 'Dados do paciente atualizados com sucesso!' });
       } else {
-        const newPatient: Patient = {
-          ...patientData,
-          id: Math.random().toString(36).substr(2, 9),
-          status: 'active'
-        };
-        const createdPatient = await createPatient(newPatient);
+        let createdPatient: Patient | null = null;
+        try {
+          createdPatient = await createPatient(newPatient);
 
-        const newAppointment: Appointment = {
-          id: Math.random().toString(36).substr(2, 9),
-          patientId: createdPatient.id,
-          patientName: createdPatient.name,
-          date: formDate,
-          time: createdPatient.fixedTime,
-          status: 'scheduled',
-          source: 'internal',
-          notes: 'Primeira consulta (Gerada automaticamente no cadastro)'
-        };
-        await createAppointment(newAppointment);
+          const newAppointment: Appointment = {
+            id: Math.random().toString(36).substr(2, 9),
+            patientId: createdPatient.id,
+            patientName: createdPatient.name,
+            date: formDate,
+            time: createdPatient.fixedTime,
+            status: 'scheduled',
+            source: 'internal',
+            notes: 'Primeira consulta (Gerada automaticamente no cadastro)'
+          };
+          await createAppointment(newAppointment);
 
-        await Promise.all([
-          sendNotification('whatsapp', createdPatient.name, formDate),
-          sendNotification('email', createdPatient.name, formDate)
-        ]);
+          await Promise.all([
+            sendNotification('whatsapp', createdPatient.name, formDate),
+            sendNotification('email', createdPatient.name, formDate)
+          ]);
 
-        setPatients(prev => [...prev, createdPatient]);
-        setAlert({
-          type: 'success',
-          message: 'Paciente salvo, agendado na data escolhida e notificações enviadas com sucesso!'
-        });
+          setPatients(prev => [...prev, createdPatient!]);
+          setAlert({
+            type: 'success',
+            message: 'Paciente salvo, agendado na data escolhida e notificações enviadas com sucesso!'
+          });
+        } catch (err) {
+          console.error(err);
+          // Rollback: Attempt to delete the patient if appointment creation failed
+          if (createdPatient && createdPatient.id) {
+            await deletePatient(createdPatient.id).catch(delErr =>
+              console.error('Falha ao realizar rollback (excluir paciente):', delErr)
+            );
+          }
+          throw new Error('Falha ao agendar primeira consulta. O cadastro foi revertido. Tente novamente.');
+        }
       }
       setIsModalOpen(false);
     } catch (error) {
