@@ -46,100 +46,22 @@ export const onAuthStateChange = (callback: (user: any) => void) => {
 // PATIENTS CRUD
 // ========================================
 
+import { patientService } from './features/patients/patient.service'
+
 export const getPatients = async (): Promise<Patient[]> => {
-    await ensureAuthenticated()
-
-    const { data, error } = await supabase
-        .from('patients')
-        .select('*')
-        .order('name')
-
-    if (error) throw error
-
-    return data.map(p => ({
-        id: p.id,
-        name: p.name,
-        email: p.email,
-        phone: p.phone || '',
-        paymentType: p.payment_type as PaymentType,
-        fixedDay: p.fixed_day || '',
-        fixedTime: p.fixed_time || '',
-        status: p.status as 'active' | 'inactive'
-    }))
+    return patientService.getAll()
 }
 
 export const createPatient = async (patient: Patient): Promise<Patient> => {
-    await ensureAuthenticated()
-
-    const { data, error } = await supabase
-        .from('patients')
-        .insert({
-            name: patient.name,
-            email: patient.email,
-            phone: patient.phone,
-            payment_type: patient.paymentType,
-            fixed_day: patient.fixedDay,
-            fixed_time: patient.fixedTime,
-            status: patient.status
-        })
-        .select()
-        .single()
-
-    if (error) throw error
-
-    return {
-        id: data.id,
-        name: data.name,
-        email: data.email,
-        phone: data.phone || '',
-        paymentType: data.payment_type as PaymentType,
-        fixedDay: data.fixed_day || '',
-        fixedTime: data.fixed_time || '',
-        status: data.status as 'active' | 'inactive'
-    }
+    return patientService.create(patient)
 }
 
 export const updatePatient = async (patient: Patient): Promise<Patient> => {
-    await ensureAuthenticated()
-
-    const { data, error } = await supabase
-        .from('patients')
-        .update({
-            name: patient.name,
-            email: patient.email,
-            phone: patient.phone,
-            payment_type: patient.paymentType,
-            fixed_day: patient.fixedDay,
-            fixed_time: patient.fixedTime,
-            status: patient.status
-        })
-        .eq('id', patient.id)
-        .select()
-        .single()
-
-    if (error) throw error
-
-    return {
-        id: data.id,
-        name: data.name,
-        email: data.email,
-        phone: data.phone || '',
-        paymentType: data.payment_type as PaymentType,
-        fixedDay: data.fixed_day || '',
-        fixedTime: data.fixed_time || '',
-        status: data.status as 'active' | 'inactive'
-    }
+    return patientService.update(patient)
 }
 
 export const deletePatient = async (id: string): Promise<void> => {
-    await ensureAuthenticated()
-
-    const { error } = await supabase
-        .from('patients')
-        .delete()
-        .eq('id', id)
-
-    if (error) throw error
+    return patientService.delete(id)
 }
 
 // ========================================

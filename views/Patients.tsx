@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Edit2, Trash, X, Save, User, Mail, Phone, Calendar, Clock, CreditCard, Loader2, AlertTriangle, MessageCircle, CheckCircle, FileSpreadsheet, Upload } from 'lucide-react';
 import { Patient, PaymentType, Appointment } from '../types';
-import { getPatients, createPatient, updatePatient, deletePatient, createAppointment, sendNotification } from '../services/supabaseService';
+import { createAppointment, sendNotification } from '../services/supabaseService';
+import { patientService } from '../services/features/patients/patient.service';
 import { Alert } from '../components/ui/Alert';
 import ExcelJS from 'exceljs';
 
@@ -34,7 +35,7 @@ const Patients: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
 
   const fetchPatients = async () => {
-    const data = await getPatients();
+    const data = await patientService.getAll();
     setPatients(data);
   };
 
@@ -85,7 +86,7 @@ const Patients: React.FC = () => {
     if (!patientToDelete) return;
     setIsDeleting(true);
     try {
-      await deletePatient(patientToDelete);
+      await patientService.delete(patientToDelete);
       setPatients(prev => prev.filter(p => p.id !== patientToDelete));
       setAlert({ type: 'success', message: 'Paciente removido com sucesso.' });
     } catch (error) {
@@ -112,13 +113,13 @@ const Patients: React.FC = () => {
       } as Patient;
 
       if (isEditing && currentPatient.id) {
-        const updated = await updatePatient(patientData);
+        const updated = await patientService.update(patientData);
         setPatients(prev => prev.map(p => (p.id === updated.id ? updated : p)));
         setAlert({ type: 'success', message: 'Dados do paciente atualizados com sucesso!' });
       } else {
         let createdPatient: Patient | null = null;
         try {
-          createdPatient = await createPatient(newPatient);
+          createdPatient = await patientService.create(patientData);
 
           const newAppointment: Appointment = {
             id: Math.random().toString(36).substr(2, 9),
@@ -146,7 +147,7 @@ const Patients: React.FC = () => {
           console.error(err);
           // Rollback: Attempt to delete the patient if appointment creation failed
           if (createdPatient && createdPatient.id) {
-            await deletePatient(createdPatient.id).catch(delErr =>
+            await patientService.delete(createdPatient.id).catch(delErr =>
               console.error('Falha ao realizar rollback (excluir paciente):', delErr)
             );
           }
@@ -227,7 +228,7 @@ const Patients: React.FC = () => {
 
       // Create patients sequentially
       for (const patient of newPatients) {
-        await createPatient(patient);
+        await patientService.create(patient);
       }
 
       setPatients(prev => [...prev, ...newPatients]);

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Users, DollarSign, CalendarCheck, AlertTriangle, Bell, X, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { getAppointments, getPatients, getExpenses } from '../services/supabaseService';
+import { getAppointments, getExpenses } from '../services/supabaseService';
+import { patientService } from '../services/features/patients/patient.service';
 import { Appointment, Patient, Expense } from '../types';
 import moment from 'moment';
 import 'moment/locale/pt-br';
@@ -51,7 +52,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       try {
         const [apps, pats, exps] = await Promise.all([
           getAppointments(),
-          getPatients(),
+          patientService.getAll(),
           getExpenses()
         ]);
 
