@@ -1,0 +1,4 @@
+project_id = "psimanager"
+
+[functions.send-welcome-email]
+verify_jwt = false # Webhooks don't send a JWT in the Authorization header by default in this context, or we verify the signature manually given more time. For now, we assume internal trigger.
