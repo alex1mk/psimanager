@@ -1,99 +1,21 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Calendar, momentLocalizer, Views } from 'react-big-calendar';
-import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import moment from 'moment';
-import { Calendar as CalendarIcon, Clock, MessageCircle, Mail, CheckCircle, Plus, X, User, ArrowRight, AlertTriangle, Loader2, Link as LinkIcon, Check, Filter, CalendarDays, Save, ChevronLeft, ChevronRight } from 'lucide-react';
+import 'moment/locale/pt-br';
+import { Calendar as CalendarIcon, Clock, MessageCircle, Mail, CheckCircle, Plus, X, User, ArrowRight, AlertTriangle, Loader2, Link as LinkIcon, Check, Filter, CalendarDays, Save, ChevronLeft, ChevronRight, Coffee } from 'lucide-react';
+import { DayPicker } from 'react-day-picker';
+import 'react-day-picker/dist/style.css';
+import { ptBR } from 'date-fns/locale';
+import { format, parse, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isToday } from 'date-fns';
+import { DatePickerInput } from '../src/components/ui/DatePickerInput';
+import '../src/styles/agenda.css';
 import { Appointment, Patient } from '../types';
 import { getAppointments, getPatients, createAppointment, updateAppointment, sendNotification, connectGoogleCalendar, fetchGoogleCalendarEvents, exportToGoogleCalendar } from '../services/supabaseService';
 import { Alert } from '../components/ui/Alert';
 
-// Setup localizer
-moment.locale('pt-br');
-const localizer = momentLocalizer(moment);
-const DnDCalendar = withDragAndDrop(Calendar);
-
-// Portuguese translation for calendar
-const messages = {
-  allDay: 'Dia inteiro',
-  previous: 'Anterior',
-  next: 'Próximo',
-  today: 'Hoje',
-  month: 'Mês',
-  week: 'Semana',
-  day: 'Dia',
-  agenda: 'Agenda',
-  date: 'Data',
-  time: 'Hora',
-  event: 'Evento',
-  noEventsInRange: 'Não há eventos neste período.',
-};
-
-const CustomToolbar = (toolbar: any) => {
-  const goToBack = () => {
-    toolbar.onNavigate('PREV');
-  };
-
-  const goToNext = () => {
-    toolbar.onNavigate('NEXT');
-  };
-
-  const goToCurrent = () => {
-    toolbar.onNavigate('TODAY');
-  };
-
-  const label = () => {
-    return (
-      <div className="flex items-center gap-4 justify-center">
-        <button
-          onClick={goToBack}
-          className="p-1 hover:bg-slate-100 rounded-full text-slate-500 hover:-translate-y-1 transition-transform duration-300 ease-in-out"
-          title="Mês Anterior"
-        >
-          <ChevronLeft size={24} />
-        </button>
-        <span className="text-xl font-bold text-slate-800 capitalize min-w-[150px] text-center">
-          {toolbar.label}
-        </span>
-        <button
-          onClick={goToNext}
-          className="p-1 hover:bg-slate-100 rounded-full text-slate-500 hover:-translate-y-1 transition-transform duration-300 ease-in-out"
-          title="Próximo Mês"
-        >
-          <ChevronRight size={24} />
-        </button>
-      </div>
-    );
-  };
-
-  return (
-    <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 p-2 border-b border-gray-100 pb-4">
-      <div className="flex gap-2 w-full md:w-auto justify-center md:justify-start">
-        <button onClick={goToCurrent} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-gray-50 hover:-translate-y-1 transition-transform duration-300 ease-in-out">Hoje</button>
-        <button onClick={goToBack} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-gray-50 hover:-translate-y-1 transition-transform duration-300 ease-in-out">Anterior</button>
-        <button onClick={goToNext} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-gray-50 hover:-translate-y-1 transition-transform duration-300 ease-in-out">Próximo</button>
-      </div>
-
-      <div className="flex-1 w-full md:w-auto">
-        {label()}
-      </div>
-
-      <div className="flex gap-2 w-full md:w-auto justify-center md:justify-end">
-        {['month', 'week', 'day'].map(view => (
-          <button
-            key={view}
-            onClick={() => toolbar.onView(view)}
-            className={`px-4 py-2 border rounded-lg text-sm font-medium capitalize hover:-translate-y-1 transition-transform duration-300 ease-in-out ${toolbar.view === view
-              ? 'bg-teal-50 text-teal-700 border-teal-200 shadow-sm'
-              : 'bg-white text-slate-600 border-gray-200 hover:bg-gray-50'
-              }`}
-          >
-            {view === 'month' ? 'Mês' : view === 'week' ? 'Semana' : 'Dia'}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
+// Setup moment locale
+moment.updateLocale('pt-br', {
+  weekdaysShort: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+});
 
 const Agenda: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -125,6 +47,49 @@ const Agenda: React.FC = () => {
   // Google Calendar State
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
+
+  const daysInMonth = useMemo(() => {
+    const start = startOfWeek(startOfMonth(currentDate), { weekStartsOn: 0 });
+    const end = endOfWeek(endOfMonth(currentDate), { weekStartsOn: 0 });
+    const days = eachDayOfInterval({ start, end });
+
+    return days.map(day => {
+      const dateStr = format(day, 'yyyy-MM-dd');
+      const dayAppointments = appointments
+        .filter(app => app.date === dateStr)
+        .filter(app => {
+          if (filterStatus !== 'all' && app.status !== filterStatus) return false;
+          if (filterPatient && !app.patientName.toLowerCase().includes(filterPatient.toLowerCase())) return false;
+          return true;
+        })
+        .sort((a, b) => a.time.localeCompare(b.time));
+
+      return {
+        date: dateStr,
+        dayNumber: day.getDate(),
+        isCurrentMonth: isSameMonth(day, currentDate),
+        isToday: isToday(day),
+        appointments: dayAppointments
+      };
+    });
+  }, [currentDate, appointments, filterStatus, filterPatient]);
+
+  // Click outside to close date picker
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setIsDatePickerOpen(false);
+      }
+    };
+    if (isDatePickerOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDatePickerOpen]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -136,25 +101,6 @@ const Agenda: React.FC = () => {
     fetchData();
   }, []);
 
-  const events = useMemo(() => {
-    return appointments
-      .filter(app => {
-        if (filterStatus !== 'all' && app.status !== filterStatus) return false;
-        if (filterPatient && !app.patientName.toLowerCase().includes(filterPatient.toLowerCase())) return false;
-        return true;
-      })
-      .map(app => {
-        const start = new Date(`${app.date}T${app.time}`);
-        const end = new Date(start.getTime() + 60 * 60 * 1000);
-        return {
-          id: app.id,
-          title: app.patientName,
-          start,
-          end,
-          resource: app,
-        };
-      });
-  }, [appointments, filterStatus, filterPatient]);
 
   const handleConnectGoogle = async () => {
     setIsSyncing(true);
@@ -172,8 +118,13 @@ const Agenda: React.FC = () => {
       });
 
       setNotificationStatus({ type: 'success', message: 'Conectado e sincronizado com Google Calendar!' });
-    } catch (error) {
-      setNotificationStatus({ type: 'error', message: 'Erro ao conectar com Google.' });
+    } catch (error: any) {
+      console.error('Google Sync Error:', error);
+      const errorMsg = error.message || 'Erro de conexão ou permissão negada.';
+      setNotificationStatus({
+        type: 'error',
+        message: `Não foi possível sincronizar com o Google: ${errorMsg}. Verifique se a conta está disponível.`
+      });
     } finally {
       setIsSyncing(false);
     }
@@ -259,8 +210,8 @@ const Agenda: React.FC = () => {
     }
   };
 
-  const handleCreateAppointment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateAppointment = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!newAppointment.patientId || !newAppointment.date || !newAppointment.time) {
       setNotificationStatus({ type: 'error', message: 'Preencha paciente, data e horário.' });
       return;
@@ -303,129 +254,24 @@ const Agenda: React.FC = () => {
 
   // ... (imports remain the same, just updating styles)
 
-  const eventStyleGetter = (event: any) => {
-    const status = event.resource.status;
-    const isGoogle = event.resource.source === 'google';
 
-    if (isGoogle) {
-      return {
-        style: {
-          backgroundColor: '#3b82f6',
-          borderColor: '#2563eb',
-          color: 'white',
-          border: '0px',
-          display: 'block',
-          fontSize: '0.85rem',
-          fontWeight: '500',
-          opacity: 0.9,
-          borderLeft: '4px solid #1e40af',
-          transition: 'transform 0.2s',
-        },
-        className: 'hover:-translate-y-1 shadow-sm'
-      };
-    }
-
-    // Default Theme Green (#b4df9f) for scheduled events as requested
-    // Confirmed = Darker Green (#599e4a)
-    // Cancelled = Red
-
-    let backgroundColor = '#b4df9f'; // Light Green (Standard)
-    let borderColor = '#86be74';
-    let color = '#1a2e1a'; // Darker text for contrast on light green
-
-    switch (status) {
-      case 'confirmed':
-        backgroundColor = '#599e4a'; // Sidebar Green
-        borderColor = '#2c9e40';
-        color = 'white';
-        break;
-      case 'cancelled':
-        backgroundColor = '#ef4444';
-        borderColor = '#dc2626';
-        color = 'white';
-        break;
-      case 'completed':
-        backgroundColor = '#cbd5e1';
-        borderColor = '#94a3b8';
-        color = '#334155';
-        break;
-      case 'scheduled':
-      default:
-        backgroundColor = '#b4df9f';
-        borderColor = '#a3cfa3';
-        color = '#14532d'; // Dark Green text
-        break;
-    }
-
-    return {
-      style: {
-        backgroundColor,
-        borderColor,
-        color,
-        border: '1px solid ' + borderColor, // Added border
-        display: 'block',
-        fontSize: '0.85rem',
-        fontWeight: '600',
-        borderRadius: '6px',
-        transition: 'all 0.2s ease-in-out',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-      },
-      className: 'hover:-translate-y-1 hover:shadow-md cursor-pointer'
-    };
-  };
-
-  const { components } = useMemo(() => ({
-    components: {
-      toolbar: CustomToolbar,
-      event: ({ event }: any) => (
-        <div className="flex items-center justify-between w-full h-full overflow-hidden px-2 py-0.5">
-          <span className="truncate text-xs sm:text-sm flex items-center gap-1 font-bold">
-            {event.resource.source === 'google' && <CalendarIcon size={12} className="text-white/80" />}
-            {event.title}
-          </span>
-          {event.resource.status === 'scheduled' && event.resource.source !== 'google' && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleConfirm(event.resource.id, event.title);
-              }}
-              className="ml-1 p-0.5 bg-white/30 hover:bg-white/60 rounded text-teal-900 flex-shrink-0 transition-colors"
-              title="Confirmar Presença"
-            >
-              <CheckCircle size={14} />
-            </button>
-          )}
-        </div>
-      )
-    }
-  }), [handleConfirm]);
-
-  const customDayPropGetter = (date: Date) => {
-    // Optional: Style today or specific days
-    return {
-      style: {
-        backgroundColor: 'transparent' // Default
-      }
-    };
-  };
-
-  if (loading) return <div className="p-8 text-center text-slate-500">Carregando agenda...</div>;
+  if (loading) return <div className="p-8 text-center text-verde-botanico">Carregando agenda...</div>;
 
   return (
-    <div className="space-y-6 h-full flex flex-col">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="space-y-6 h-full flex flex-col p-6 bg-bege-calmo rounded-3xl border border-verde-botanico/10 shadow-inner relative overflow-hidden">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10 font-sans">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Agenda</h2>
-          <p className="text-slate-500">Arraste os eventos para remarcar consultas.</p>
+          <h2 className="text-3xl font-sans font-bold text-verde-botanico">Agenda</h2>
+          <p className="text-verde-botanico/60 italic font-sans text-sm">Seu planner pessoal de cuidado e acolhimento.</p>
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        <div className="flex items-center gap-3 w-full md:w-auto">
           <button
             onClick={handleConnectGoogle}
             disabled={isSyncing || isGoogleConnected}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border hover:-translate-y-1 transition-transform duration-300 ease-in-out ${isGoogleConnected
-              ? 'bg-[#f0f7ed] text-[#599e4a] border-[#b4df9f]'
-              : 'bg-white text-slate-600 border-gray-200 hover:bg-gray-50'
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all duration-300 ${isGoogleConnected
+              ? 'bg-verde-botanico/10 text-verde-botanico border-verde-botanico/20'
+              : 'bg-white text-verde-botanico border-verde-botanico/20 hover:shadow-md'
               }`}
           >
             {isSyncing ? <Loader2 size={16} className="animate-spin" /> : isGoogleConnected ? <Check size={16} /> : <LinkIcon size={16} />}
@@ -434,63 +280,75 @@ const Agenda: React.FC = () => {
 
           <button
             onClick={() => setIsNewModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#599e4a] text-white rounded-lg hover:bg-[#4a8a3c] shadow-sm hover:-translate-y-1 transition-transform duration-300 ease-in-out ml-auto md:ml-0"
+            className="flex items-center gap-2 px-5 py-2.5 bg-verde-botanico text-white rounded-xl hover:bg-verde-botanico/90 shadow-md hover:shadow-lg transition-all duration-300 ml-auto md:ml-0"
           >
-            <Plus size={18} />
-            <span className="hidden sm:inline">Novo Agendamento</span>
+            <Plus size={20} />
+            <span className="hidden sm:inline font-medium">Novo Agendamento</span>
           </button>
         </div>
       </div>
 
       {/* Filters & Navigation Toolbar */}
-      <div className="bg-white p-3 rounded-lg border border-gray-200 flex flex-col sm:flex-row gap-4 items-center shadow-sm">
-        <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
-          <Filter size={16} />
+      <div className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-verde-botanico/10 flex flex-col sm:flex-row gap-4 items-center shadow-sm relative z-10">
+        <div className="flex items-center gap-2 text-verde-botanico/70 text-sm font-medium">
+          <Filter size={18} />
           Filtros:
         </div>
 
         <div className="flex-1 w-full sm:w-auto">
           <input
             type="text"
-            placeholder="Buscar paciente..."
+            placeholder="Buscar por nome do paciente..."
             value={filterPatient}
             onChange={(e) => setFilterPatient(e.target.value)}
-            className="w-full px-3 py-1.5 bg-[#f0f7ed] border border-gray-200 rounded-md text-sm focus:ring-1 focus:ring-[#599e4a] focus:border-[#599e4a]"
+            className="w-full px-4 py-2 bg-white/80 border border-verde-botanico/20 rounded-xl text-sm focus:ring-2 focus:ring-verde-botanico/30 focus:border-verde-botanico outline-none transition-all"
           />
         </div>
 
         {/* Date Navigator with Integrated Arrows */}
-        <div className="flex items-center gap-2 border-l border-r border-gray-200 px-4 mx-2">
-          <CalendarDays size={16} className="text-slate-400" />
-          <span className="text-xs text-slate-500 font-semibold uppercase">DATA</span>
-          <div className="flex items-center bg-white border border-gray-200 rounded-lg overflow-hidden transition-transform hover:-translate-y-0.5">
+        <div className="flex items-center gap-3 border-l border-r border-verde-botanico/10 px-6 mx-2 relative">
+          <span className="text-xs text-verde-botanico/50 font-bold uppercase tracking-widest">DATA</span>
+          <div className="flex items-center bg-white border border-verde-botanico/20 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all">
             <button
               onClick={() => {
                 const newDate = new Date(currentDate);
                 newDate.setMonth(newDate.getMonth() - 1);
                 setCurrentDate(newDate);
               }}
-              className="p-1.5 hover:bg-[#f0f7ed] text-slate-500 border-r border-gray-200 transition-colors"
+              className="p-2 hover:bg-bege-calmo text-verde-botanico border-r border-verde-botanico/10 transition-colors"
               title="Mês Anterior"
             >
-              <ChevronLeft size={14} />
+              <ChevronLeft size={16} />
             </button>
-            <div className="relative">
-              <input
-                type="date"
-                className="pl-2 pr-8 py-1 text-sm bg-white border-none text-slate-700 focus:outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:top-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer relative z-10"
-                value={moment(currentDate).format('YYYY-MM-DD')}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    const [year, month, day] = e.target.value.split('-').map(Number);
-                    const newDate = new Date(year, month - 1, day);
-                    setCurrentDate(newDate);
-                  }
-                }}
-              />
-              <div className="absolute top-1/2 right-2 -translate-y-1/2 pointer-events-none z-20 text-slate-500">
-                <CalendarIcon size={14} />
-              </div>
+            <div className="relative z-[9999]" ref={datePickerRef}>
+              <button
+                onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-bold text-verde-botanico bg-transparent hover:bg-bege-calmo transition-colors rounded-lg border border-verde-botanico/10"
+              >
+                <CalendarIcon size={16} className="text-verde-botanico/60" />
+                {moment(currentDate).format('MMMM YYYY')}
+              </button>
+
+              {isDatePickerOpen && (
+                <div className="day-picker-popover">
+                  <DayPicker
+                    mode="single"
+                    locale={ptBR}
+                    selected={currentDate}
+                    onSelect={(date) => {
+                      if (date) {
+                        setCurrentDate(date);
+                        setIsDatePickerOpen(false);
+                      }
+                    }}
+                    month={currentDate}
+                    onMonthChange={setCurrentDate}
+                    formatters={{
+                      formatWeekdayName: (date) => format(date, 'EEEEEE', { locale: ptBR })
+                    }}
+                  />
+                </div>
+              )}
             </div>
             <button
               onClick={() => {
@@ -498,21 +356,21 @@ const Agenda: React.FC = () => {
                 newDate.setMonth(newDate.getMonth() + 1);
                 setCurrentDate(newDate);
               }}
-              className="p-1.5 hover:bg-[#f0f7ed] text-slate-500 border-l border-gray-200 transition-colors"
+              className="p-2 hover:bg-bege-calmo text-verde-botanico border-l border-verde-botanico/10 transition-colors"
               title="Próximo Mês"
             >
-              <ChevronRight size={14} />
+              <ChevronRight size={16} />
             </button>
           </div>
         </div>
 
-        <div className="w-full sm:w-48">
+        <div className="w-full sm:w-52">
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="w-full px-3 py-1.5 bg-[#f0f7ed] border border-gray-200 rounded-md text-sm focus:ring-1 focus:ring-[#599e4a] focus:border-[#599e4a] text-slate-700"
+            className="w-full px-4 py-2 bg-white/80 border border-verde-botanico/20 rounded-xl text-sm focus:ring-2 focus:ring-verde-botanico/30 focus:border-verde-botanico outline-none text-verde-botanico font-medium transition-all"
           >
-            <option value="all">Todos os Status</option>
+            <option value="all">Filtrar por Status</option>
             <option value="scheduled">Agendados</option>
             <option value="confirmed">Confirmados</option>
             <option value="completed">Realizados</option>
@@ -521,288 +379,307 @@ const Agenda: React.FC = () => {
         </div>
       </div>
 
-      {notificationStatus && (
-        <Alert
-          type={notificationStatus.type}
-          message={notificationStatus.message}
-          onClose={() => setNotificationStatus(null)}
-        />
-      )}
+      {
+        notificationStatus && (
+          <Alert
+            type={notificationStatus.type}
+            message={notificationStatus.message}
+            onClose={() => setNotificationStatus(null)}
+          />
+        )
+      }
 
       {/* Calendar View */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-4 h-[600px] hover:shadow-md transition-shadow">
-        {/* Style overwrite for Calendar Header */}
-        <style>{`
-          .rbc-header {
-             background-color: #f0f7ed !important;
-             padding: 12px 0 !important;
-             color: #14532d !important;
-             font-weight: 700 !important;
-             border-bottom: 1px solid #b4df9f !important;
-             text-transform: uppercase;
-             font-size: 0.8rem;
-          }
-          .rbc-today {
-             background-color: #f8fafc !important;
-          }
-          .rbc-off-range-bg {
-             background-color: #fefefe !important;
-          }
-          /* Hover effect on cells is tricky in big-calendar without custom components, 
-             but we added hover effects to events */
-        `}</style>
-        <DnDCalendar
-          localizer={localizer}
-          events={events}
-          date={currentDate}
-          onNavigate={(date) => setCurrentDate(date)}
-          startAccessor="start"
-          endAccessor="end"
-          style={{ height: '100%' }}
-          messages={messages}
-          culture='pt-br'
-          eventPropGetter={eventStyleGetter}
-          dayPropGetter={customDayPropGetter}
-          components={components}
-          onSelectEvent={(event) => setSelectedEvent(event)}
-          onEventDrop={onEventDrop}
-          resizable={false}
-          views={['month', 'week', 'day']}
-          defaultView={Views.MONTH}
-          popup
-          selectable
+      <div className="calendar-main-container">
+        {/* Imagem de fundo da xícara */}
+        <img
+          src="/assets/coffee-cup.svg"
+          alt=""
+          className="calendar-coffee-bg"
         />
-      </div>
 
-// ... (rest of the modal code remains similar but we should update button colors there too if needed, but for now focusing on main view)
+        {/* Conteúdo do calendário */}
+        <div className="calendar-content">
+          {/* Cabeçalho com dias da semana */}
+          <div className="calendar-header">
+            <div className="calendar-header-cell">Dom</div>
+            <div className="calendar-header-cell">Seg</div>
+            <div className="calendar-header-cell">Ter</div>
+            <div className="calendar-header-cell">Qua</div>
+            <div className="calendar-header-cell">Qui</div>
+            <div className="calendar-header-cell">Sex</div>
+            <div className="calendar-header-cell">Sáb</div>
+          </div>
+
+          {/* Grid do calendário */}
+          <div className="calendar-grid">
+            {daysInMonth.map((day) => (
+              <div
+                key={day.date}
+                className={`calendar-cell ${day.isToday ? 'calendar-cell-today' : ''} ${!day.isCurrentMonth ? 'calendar-cell-other-month' : ''}`}
+                onClick={() => {
+                  setNewAppointment(prev => ({ ...prev, date: day.date }));
+                  setIsNewModalOpen(true);
+                }}
+              >
+                <div className="calendar-day-number font-sans">{day.dayNumber}</div>
+
+                {/* Compromissos do dia */}
+                <div className="space-y-1">
+                  {day.appointments.map((apt) => (
+                    <div
+                      key={apt.id}
+                      className="calendar-appointment truncate font-sans"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedEvent({
+                          id: apt.id,
+                          title: apt.patientName,
+                          start: new Date(`${apt.date}T${apt.time}`),
+                          resource: apt
+                        });
+                      }}
+                    >
+                      {apt.time} - {apt.patientName}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* New Appointment Modal */}
       {isNewModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="bg-slate-50 p-4 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                <Plus size={20} className="text-teal-600" /> Novo Agendamento
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md modal-content">
+            <div className="bg-bege-calmo/50 p-4 border-b border-verde-botanico/10 flex justify-between items-center rounded-t-xl">
+              <h3 className="font-bold text-verde-botanico text-lg flex items-center gap-2 font-display">
+                <Plus size={20} /> Novo Agendamento
               </h3>
               <button
                 onClick={() => setIsNewModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg p-1"
+                className="text-verde-botanico hover:text-verde-botanico hover:bg-slate-200 rounded-lg p-1"
               >
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleCreateAppointment} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Paciente</label>
-                <select
-                  required
-                  value={newAppointment.patientId}
-                  onChange={(e) => setNewAppointment({ ...newAppointment, patientId: e.target.value })}
-                  className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-slate-800"
+            <div className="modal-inner-scroll p-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-verde-botanico mb-2">
+                    Paciente
+                  </label>
+                  <select
+                    value={newAppointment.patientId}
+                    onChange={(e) => setNewAppointment({ ...newAppointment, patientId: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-verde-botanico text-verde-botanico"
+                  >
+                    <option value="">Selecione um paciente</option>
+                    {patients.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-verde-botanico mb-2">
+                      Data
+                    </label>
+                    <DatePickerInput
+                      value={new Date(newAppointment.date + 'T12:00:00')}
+                      onChange={(date) => setNewAppointment({ ...newAppointment, date: date ? format(date, 'yyyy-MM-dd') : '' })}
+                      placeholder="28/01/2026"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-verde-botanico mb-2">
+                      Horário
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="time"
+                        value={newAppointment.time}
+                        onChange={(e) => setNewAppointment({ ...newAppointment, time: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-verde-botanico text-verde-botanico"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleCreateAppointment()}
+                  disabled={isCreating}
+                  className="w-full bg-verde-botanico text-white py-2.5 px-4 rounded-xl hover:bg-verde-botanico/90 transition-all font-bold text-sm shadow-md flex items-center justify-center gap-2"
                 >
-                  <option value="">Selecione um paciente</option>
-                  {patients.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
+                  {isCreating ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                  Agendar Consulta
+                </button>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
-                  <div className="relative">
-                    <input
-                      type="date"
-                      required
-                      value={newAppointment.date}
-                      onChange={(e) => setNewAppointment({ ...newAppointment, date: e.target.value })}
-                      className="bg-white w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-slate-800 pr-10 appearance-none relative z-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:top-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                    />
-                    <div className="absolute top-1/2 right-3 -translate-y-1/2 pointer-events-none z-20 text-slate-500">
-                      <CalendarIcon size={20} />
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Horário</label>
-                  <div className="relative">
-                    <input
-                      type="time"
-                      required
-                      value={newAppointment.time}
-                      onChange={(e) => setNewAppointment({ ...newAppointment, time: e.target.value })}
-                      className="bg-white w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-slate-800 pr-10 appearance-none relative z-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:top-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                    />
-                    <div className="absolute top-1/2 right-3 -translate-y-1/2 pointer-events-none z-20 text-slate-500">
-                      <Clock size={20} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <button
-                type="submit"
-                disabled={isCreating}
-                className="w-full py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium flex justify-center items-center gap-2"
-              >
-                {isCreating ? <Loader2 className="animate-spin" /> : <Save size={18} />}
-                Agendar
-              </button>
-            </form>
+            </div>
           </div>
         </div>
       )}
 
       {/* Appointment Details Modal */}
-      {selectedEvent && !draggedEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
-            <div className="bg-slate-50 p-4 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                <User size={18} className="text-teal-600" />
-                Detalhes do Agendamento
-              </h3>
-              <button
-                onClick={() => setSelectedEvent(null)}
-                className="text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg p-1 transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl ${selectedEvent.resource.source === 'google' ? 'bg-blue-100 text-blue-600' : 'bg-teal-50 text-teal-600'
-                  }`}>
-                  {selectedEvent.title.charAt(0)}
-                </div>
-                <div>
-                  <h4 className="text-xl font-bold text-slate-800">{selectedEvent.title}</h4>
-                  <p className="text-slate-500 text-sm flex items-center gap-1">
-                    <Clock size={14} />
-                    {moment(selectedEvent.start).format('DD/MM/YYYY [às] HH:mm')}
-                  </p>
-                </div>
+      {
+        selectedEvent && !draggedEvent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
+              <div className="bg-slate-50 p-4 border-b border-gray-100 flex justify-between items-center">
+                <h3 className="font-bold text-verde-botanico flex items-center gap-2">
+                  <User size={18} className="text-teal-600" />
+                  Detalhes do Agendamento
+                </h3>
+                <button
+                  onClick={() => setSelectedEvent(null)}
+                  className="text-verde-botanico hover:text-verde-botanico hover:bg-slate-200 rounded-lg p-1 transition-colors"
+                >
+                  <X size={20} />
+                </button>
               </div>
 
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                <div className="flex justify-between">
+              <div className="p-6 space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl ${selectedEvent.resource.source === 'google' ? 'bg-blue-100 text-blue-600' : 'bg-teal-50 text-teal-600'
+                    }`}>
+                    {selectedEvent.title.charAt(0)}
+                  </div>
                   <div>
-                    <div className="text-xs font-semibold text-slate-500 uppercase mb-1">Status</div>
-                    <div className="flex items-center gap-2">
-                      <span className={`w-3 h-3 rounded-full ${selectedEvent.resource.status === 'confirmed' ? 'bg-green-500' :
-                        selectedEvent.resource.status === 'cancelled' ? 'bg-red-500' : 'bg-teal-500'
-                        }`}></span>
-                      <span className="text-slate-700 font-medium capitalize">
-                        {selectedEvent.resource.status === 'confirmed' ? 'Confirmado' :
-                          selectedEvent.resource.status === 'scheduled' ? 'Agendado' :
-                            selectedEvent.resource.status}
-                      </span>
+                    <h4 className="text-xl font-bold text-verde-botanico">{selectedEvent.title}</h4>
+                    <p className="text-verde-botanico text-sm flex items-center gap-1">
+                      <Clock size={14} />
+                      {moment(selectedEvent.start).format('DD/MM/YYYY [às] HH:mm')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                  <div className="flex justify-between">
+                    <div>
+                      <div className="text-xs font-semibold text-verde-botanico uppercase mb-1">Status</div>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-3 h-3 rounded-full ${selectedEvent.resource.status === 'confirmed' ? 'bg-green-500' :
+                          selectedEvent.resource.status === 'cancelled' ? 'bg-red-500' : 'bg-teal-500'
+                          }`}></span>
+                        <span className="text-verde-botanico font-medium capitalize">
+                          {selectedEvent.resource.status === 'confirmed' ? 'Confirmado' :
+                            selectedEvent.resource.status === 'scheduled' ? 'Agendado' :
+                              selectedEvent.resource.status}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {selectedEvent.resource.source !== 'google' && (
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  {selectedEvent.resource.status === 'scheduled' && (
-                    <button
-                      onClick={() => handleConfirm(selectedEvent.resource.id, selectedEvent.title)}
-                      className="col-span-2 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors"
-                    >
-                      <CheckCircle size={18} />
-                      Confirmar Presença
+                {selectedEvent.resource.source !== 'google' && (
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    {selectedEvent.resource.status === 'scheduled' && (
+                      <button
+                        onClick={() => handleConfirm(selectedEvent.resource.id, selectedEvent.title)}
+                        className="col-span-2 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors"
+                      >
+                        <CheckCircle size={18} />
+                        Confirmar Presença
+                      </button>
+                    )}
+                    <button className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-100 text-verde-botanico rounded-lg hover:bg-slate-200 font-medium transition-colors">
+                      <MessageCircle size={18} />
+                      WhatsApp
                     </button>
-                  )}
-                  <button className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-medium transition-colors">
-                    <MessageCircle size={18} />
-                    WhatsApp
-                  </button>
-                  <button className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-medium transition-colors">
-                    <Mail size={18} />
-                    E-mail
-                  </button>
-                </div>
-              )}
-              {selectedEvent.resource.source === 'google' && (
-                <p className="text-xs text-center text-slate-400 italic mt-4">
-                  Este evento foi importado do Google Calendar e não pode ser editado aqui.
-                </p>
-              )}
+                    <button className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-100 text-verde-botanico rounded-lg hover:bg-slate-200 font-medium transition-colors">
+                      <Mail size={18} />
+                      E-mail
+                    </button>
+                  </div>
+                )}
+                {selectedEvent.resource.source === 'google' && (
+                  <p className="text-xs text-center text-verde-botanico italic mt-4">
+                    Este evento foi importado do Google Calendar e não pode ser editado aqui.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Reschedule Confirmation Modal */}
-      {draggedEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in border-t-4 border-yellow-400">
-            <div className="p-6">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="bg-yellow-100 p-3 rounded-full">
-                  <AlertTriangle className="text-yellow-600 w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-800">Remarcar Consulta?</h3>
-                  <p className="text-slate-500 text-sm mt-1">
-                    Você está movendo a consulta de <strong className="text-slate-800">{draggedEvent.event.title}</strong>.
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 flex items-center justify-between gap-2 mb-6">
-                <div className="text-center flex-1">
-                  <p className="text-xs text-slate-400 uppercase font-semibold">De</p>
-                  <p className="text-sm font-bold text-red-500 line-through decoration-2 decoration-red-200">
-                    {moment(draggedEvent.event.start).format('DD/MM HH:mm')}
-                  </p>
-                </div>
-                <ArrowRight className="text-slate-300 w-5 h-5" />
-                <div className="text-center flex-1">
-                  <p className="text-xs text-slate-400 uppercase font-semibold">Para</p>
-                  <div className="flex flex-col items-center">
-                    <span className="text-sm font-bold text-teal-600 mb-1">
-                      {moment(draggedEvent.start).format('DD/MM')}
-                    </span>
-                    {/* Time Input for precise rescheduling */}
-                    <input
-                      type="time"
-                      className="text-sm font-bold text-teal-700 bg-white border border-teal-200 rounded px-1 py-0.5 text-center w-20 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                      value={rescheduleTime}
-                      onChange={(e) => setRescheduleTime(e.target.value)}
-                    />
+      {
+        draggedEvent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in border-t-4 border-yellow-400">
+              <div className="p-6">
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="bg-yellow-100 p-3 rounded-full">
+                    <AlertTriangle className="text-yellow-600 w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-verde-botanico">Remarcar Consulta?</h3>
+                    <p className="text-verde-botanico text-sm mt-1">
+                      Você está movendo a consulta de <strong className="text-verde-botanico">{draggedEvent.event.title}</strong>.
+                    </p>
                   </div>
                 </div>
-              </div>
 
-              <p className="text-xs text-slate-400 mb-6 bg-yellow-50 p-2 rounded border border-yellow-100">
-                ⚠️ Confirme o novo horário acima. Uma notificação será enviada automaticamente.
-              </p>
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 flex items-center justify-between gap-2 mb-6">
+                  <div className="text-center flex-1">
+                    <p className="text-xs text-verde-botanico uppercase font-semibold">De</p>
+                    <p className="text-sm font-bold text-red-500 line-through decoration-2 decoration-red-200">
+                      {moment(draggedEvent.event.start).format('DD/MM HH:mm')}
+                    </p>
+                  </div>
+                  <ArrowRight className="text-verde-botanico w-5 h-5" />
+                  <div className="text-center flex-1">
+                    <p className="text-xs text-verde-botanico uppercase font-semibold">Para</p>
+                    <div className="flex flex-col items-center">
+                      <span className="text-sm font-bold text-teal-600 mb-1">
+                        {moment(draggedEvent.start).format('DD/MM')}
+                      </span>
+                      {/* Time Input for precise rescheduling */}
+                      <input
+                        type="time"
+                        className="text-sm font-bold text-teal-700 bg-white border border-teal-200 rounded px-1 py-0.5 text-center w-20 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        value={rescheduleTime}
+                        onChange={(e) => setRescheduleTime(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setDraggedEvent(null)}
-                  disabled={isRescheduling}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-slate-700 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={confirmReschedule}
-                  disabled={isRescheduling}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium transition-colors disabled:opacity-50"
-                >
-                  {isRescheduling ? (
-                    <>
-                      <Loader2 className="animate-spin w-4 h-4" />
-                      Atualizando...
-                    </>
-                  ) : 'Confirmar e Notificar'}
-                </button>
+                <p className="text-xs text-verde-botanico mb-6 bg-yellow-50 p-2 rounded border border-yellow-100">
+                  ⚠️ Confirme o novo horário acima. Uma notificação será enviada automaticamente.
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setDraggedEvent(null)}
+                    disabled={isRescheduling}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-verde-botanico rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={confirmReschedule}
+                    disabled={isRescheduling}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-verde-botanico text-white rounded-xl hover:bg-verde-botanico/90 font-bold text-sm shadow-md transition-all disabled:opacity-50"
+                  >
+                    {isRescheduling ? (
+                      <>
+                        <Loader2 className="animate-spin w-4 h-4" />
+                        Atualizando...
+                      </>
+                    ) : 'Confirmar e Notificar'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
     </div>
   );
 };

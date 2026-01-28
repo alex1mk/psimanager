@@ -133,27 +133,60 @@ async function addToGoogleCalendar(patientName: string, date: string, time: stri
         return
     }
 
-    const credentials = JSON.parse(serviceAccountKey)
-    const auth = new JWT({
-        email: credentials.client_email,
-        key: credentials.private_key,
-        scopes: ['https://www.googleapis.com/auth/calendar'],
-    })
+    try {
+        const credentials = JSON.parse(serviceAccountKey)
+        const auth = new JWT({
+            email: credentials.client_email,
+            key: credentials.private_key,
+            scopes: ['https://www.googleapis.com/auth/calendar'],
+        })
 
-    const calendar = google.calendar({ version: 'v3', auth })
+        const calendar = google.calendar({ version: 'v3', auth })
 
-    // Calculate End Time (assume 1h duration)
-    const startDate = new Date(`${date}T${time}:00`)
-    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
+        // Calculate End Time (assume 1h duration)
+        // We construct the string directly to avoid UTC conversion shifts in the SDK
+        const startDateTime = `${date}T${time}:00`
+        const [hours, minutes] = time.split(':').map(Number)
+        let endHours = hours + 1
+        let endDateStr = date
 
-    await calendar.events.insert({
-        calendarId: calendarId,
-        requestBody: {
-            summary: `Consulta - ${patientName}`,
-            description: 'Agendamento confirmado automaticamente via Supabase.',
-            start: { dateTime: startDate.toISOString(), timeZone: 'America/Sao_Paulo' },
-            end: { dateTime: endDate.toISOString(), timeZone: 'America/Sao_Paulo' },
-            colorId: '2' // Greenish
+        // Handle day overflow if 23:00 -> 00:00 (unlikely for therapy but good practice)
+        if (endHours >= 24) {
+            endHours = 0
+            const nextDay = new Date(date)
+            nextDay.setDate(nextDay.getDate() + 1)
+            endDateStr = nextDay.toISOString().split('T')[0]
         }
-    })
+        const endDateTime = `${endDateStr}T${String(endHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`
+
+        console.log(`Creating calendar event for ${patientName} at ${startDateTime}`)
+
+        await calendar.events.insert({
+            calendarId: calendarId,
+            requestBody: {
+                summary: `Consulta - ${patientName}`,
+                description: 'Agendamento confirmado automaticamente via Supabase / PsiManager.',
+                start: { 
+                    dateTime: startDateTime, 
+                    timeZone: 'America/Sao_Paulo' 
+                },
+                end: { 
+                    dateTime: endDateTime, 
+                    timeZone: 'America/Sao_Paulo' 
+                },
+                colorId: '2', // Green (Sage)
+                reminders: {
+                    useDefault: false,
+                    overrides: [
+                        { method: 'popup', minutes: 30 },
+                        { method: 'email', minutes: 60 }
+                    ]
+                }
+            }
+        })
+        console.log("Calendar event created successfully!")
+    } catch (err) {
+        console.error("Critical Google Calendar error:", err)
+        throw err // Re-throw to be caught by the outer try-catch
+    }
 }

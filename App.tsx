@@ -49,7 +49,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f0f7ed] flex font-sans text-slate-900 relative overflow-hidden">
+    <div className="min-h-screen bg-bege-calmo flex font-sans text-verde-botanico relative overflow-hidden">
 
       {/* Watermark */}
       <div className="absolute inset-0 z-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
@@ -66,7 +66,7 @@ const App: React.FC = () => {
       />
 
       {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 w-full bg-[#599e4a] text-white z-20 shadow-md px-4 py-3 flex justify-between items-center">
+      <div className="md:hidden fixed top-0 w-full bg-verde-botanico text-white z-20 shadow-md px-4 py-3 flex justify-between items-center">
         <span className="font-bold text-lg tracking-tight">PsiManager</span>
         <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
           <Menu className="text-white" />
@@ -76,7 +76,7 @@ const App: React.FC = () => {
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-30 bg-slate-900/50" onClick={() => setMobileMenuOpen(false)}>
-          <div className="bg-[#599e4a] w-64 h-full pt-16 flex flex-col justify-between" onClick={e => e.stopPropagation()}>
+          <div className="bg-verde-botanico w-64 h-full pt-16 flex flex-col justify-between" onClick={e => e.stopPropagation()}>
             <div className="flex flex-col p-4 space-y-2">
               <button onClick={() => { setCurrentView('dashboard'); setMobileMenuOpen(false); }} className="p-3 text-left hover:bg-white/10 rounded text-white font-medium">Dashboard</button>
               <button onClick={() => { setCurrentView('agenda'); setMobileMenuOpen(false); }} className="p-3 text-left hover:bg-white/10 rounded text-white font-medium">Agenda</button>

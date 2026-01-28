@@ -1,0 +1,60 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Xícara -->
+  <path d="M40 80 L40 120 Q40 130 50 130 L110 130 Q120 130 120 120 L120 80 Z" 
+        fill="#E8E4DD" stroke="#8B7355" stroke-width="2"/>
+  
+  <!-- Alça -->
+  <path d="M120 90 Q135 90 135 105 Q135 120 120 120" 
+        fill="none" stroke="#8B7355" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Café (líquido) -->
+  <ellipse cx="80" cy="82" rx="38" ry="8" fill="#6F4E37" opacity="0.8"/>
+  
+  <!-- Fumaça 1 -->
+  <path d="M60 60 Q55 50 60 40 Q65 30 60 20" 
+        fill="none" stroke="#A0A0A0" stroke-width="2" stroke-linecap="round" opacity="0.6">
+    <animate attributeName="d" 
+             dur="3s" 
+             repeatCount="indefinite"
+             values="M60 60 Q55 50 60 40 Q65 30 60 20;
+                     M60 60 Q65 50 60 40 Q55 30 60 20;
+                     M60 60 Q55 50 60 40 Q65 30 60 20"/>
+    <animate attributeName="opacity" 
+             dur="3s" 
+             repeatCount="indefinite"
+             values="0.6;0.3;0.6"/>
+  </path>
+  
+  <!-- Fumaça 2 -->
+  <path d="M80 65 Q75 55 80 45 Q85 35 80 25" 
+        fill="none" stroke="#A0A0A0" stroke-width="2" stroke-linecap="round" opacity="0.5">
+    <animate attributeName="d" 
+             dur="2.5s" 
+             repeatCount="indefinite"
+             values="M80 65 Q75 55 80 45 Q85 35 80 25;
+                     M80 65 Q85 55 80 45 Q75 35 80 25;
+                     M80 65 Q75 55 80 45 Q85 35 80 25"/>
+    <animate attributeName="opacity" 
+             dur="2.5s" 
+             repeatCount="indefinite"
+             values="0.5;0.2;0.5"/>
+  </path>
+  
+  <!-- Fumaça 3 -->
+  <path d="M100 60 Q95 50 100 40 Q105 30 100 20" 
+        fill="none" stroke="#A0A0A0" stroke-width="2" stroke-linecap="round" opacity="0.4">
+    <animate attributeName="d" 
+             dur="3.5s" 
+             repeatCount="indefinite"
+             values="M100 60 Q95 50 100 40 Q105 30 100 20;
+                     M100 60 Q105 50 100 40 Q95 30 100 20;
+                     M100 60 Q95 50 100 40 Q105 30 100 20"/>
+    <animate attributeName="opacity" 
+             dur="3.5s" 
+             repeatCount="indefinite"
+             values="0.4;0.15;0.4"/>
+  </path>
+  
+  <!-- Pires (base) -->
+  <ellipse cx="80" cy="132" rx="55" ry="10" fill="#F5F5F0" stroke="#8B7355" stroke-width="1.5"/>
+</svg>

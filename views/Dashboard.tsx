@@ -1,4 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { DayPicker } from 'react-day-picker';
+import 'react-day-picker/dist/style.css';
+import { ptBR } from 'date-fns/locale';
 import { Users, DollarSign, CalendarCheck, AlertTriangle, Bell, X, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getAppointments, getExpenses } from '../services/supabaseService';
@@ -10,12 +13,19 @@ import 'moment/locale/pt-br';
 // Ensure locale is set
 moment.locale('pt-br');
 
+// Suppress Recharts defaultProps warnings (known issue in functional components + React 18)
+const error = console.error;
+console.error = (...args: any) => {
+  if (/defaultProps/.test(args[0])) return;
+  error(...args);
+};
+
 const StatCard: React.FC<{ title: string; value: string; icon: React.ElementType; color: string; subtext: string }> = ({ title, value, icon: Icon, color, subtext }) => (
   <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex items-start justify-between hover:shadow-md transition-shadow">
     <div>
-      <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
-      <h3 className="text-2xl font-bold text-slate-800">{value}</h3>
-      <p className="text-xs text-slate-400 mt-2">{subtext}</p>
+      <p className="text-sm font-medium text-verde-botanico mb-1">{title}</p>
+      <h3 className="text-2xl font-bold text-verde-botanico">{value}</h3>
+      <p className="text-xs text-verde-botanico mt-2">{subtext}</p>
     </div>
     <div className={`p-3 rounded-lg ${color}`}>
       <Icon className="w-6 h-6 text-white" />
@@ -31,6 +41,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [upcomingCount, setUpcomingCount] = useState(0);
   const [showAlert, setShowAlert] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [startDate, setStartDate] = useState(moment().startOf('month').format('YYYY-MM-DD'));
+  const [endDate, setEndDate] = useState(moment().endOf('month').format('YYYY-MM-DD'));
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -46,6 +58,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   // State for Day Navigation in "Próximos Atendimentos"
   const [viewDate, setViewDate] = useState(new Date());
+  const [activePicker, setActivePicker] = useState<'start' | 'end' | null>(null);
+  const datePickerRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close date picker
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setActivePicker(null);
+      }
+    };
+    if (activePicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [activePicker]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -160,25 +189,26 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     <div className="space-y-6 animate-fade-in">
       {/* Notification Alert */}
       {showAlert && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-4 shadow-sm animate-in slide-in-from-top-2 duration-500">
-          <div className="bg-blue-100 p-2 rounded-full flex-shrink-0">
-            <Bell className="text-blue-600 w-5 h-5" />
+        <div className="bg-bege-calmo border border-verde-botanico/20 rounded-2xl p-4 flex items-start gap-4 shadow-md animate-in slide-in-from-top-2 duration-500 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1 h-full bg-verde-botanico/40" />
+          <div className="bg-verde-botanico/10 p-2.5 rounded-full flex-shrink-0">
+            <Bell className="text-verde-botanico w-5 h-5" />
           </div>
           <div className="flex-1 pt-0.5">
-            <h4 className="text-sm font-bold text-blue-900 mb-1">Atenção: Consultas Próximas</h4>
-            <p className="text-sm text-blue-700 leading-relaxed">
-              Você tem <span className="font-bold underline decoration-blue-400 underline-offset-2">{upcomingCount} consultas</span> agendadas para as próximas 24 horas que ainda aguardam confirmação.
+            <h4 className="text-sm font-bold text-verde-botanico mb-1 font-display">Atenção: Consultas Próximas</h4>
+            <p className="text-sm text-verde-botanico/80 leading-relaxed font-medium">
+              Você tem <span className="font-bold border-b-2 border-verde-botanico/30 pb-0.5">{upcomingCount} consultas</span> agendadas para as próximas 24 horas que ainda aguardam confirmação.
             </p>
             <button
               onClick={() => onNavigate('agenda')}
-              className="mt-3 text-xs font-semibold bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 hover:-translate-y-1 transition-transform duration-300 ease-in-out"
+              className="mt-3 text-[10px] font-bold uppercase tracking-widest bg-verde-botanico text-white px-4 py-2 rounded-xl hover:bg-verde-botanico/90 hover:shadow-lg transition-all duration-300"
             >
               Ver na Agenda
             </button>
           </div>
           <button
             onClick={() => setShowAlert(false)}
-            className="text-blue-400 hover:text-blue-600 hover:bg-blue-100 p-1 rounded-lg transition-colors"
+            className="text-verde-botanico/40 hover:text-verde-botanico hover:bg-verde-botanico/10 p-1 rounded-lg transition-colors"
             aria-label="Dispensar alerta"
           >
             <X size={18} />
@@ -186,12 +216,96 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         </div>
       )}
 
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-800">Visão Geral</h2>
-        <span className="text-sm text-slate-500 bg-white px-3 py-1 rounded-full border border-gray-200 flex items-center gap-2 shadow-sm">
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-          Sistema Operante
-        </span>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-verde-botanico/10 pb-6">
+        <div>
+          <h2 className="text-3xl font-display text-verde-botanico">Visão Geral</h2>
+          <p className="text-verde-botanico/60 italic text-sm">Resumo da sua clínica no período selecionado.</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 bg-white/60 backdrop-blur-sm p-2 rounded-2xl border border-verde-botanico/10 shadow-sm">
+          <div className="flex items-center gap-2 px-3 border-r border-verde-botanico/10">
+            <Calendar size={16} className="text-verde-botanico/50" />
+            <span className="text-[10px] font-bold text-verde-botanico/40 uppercase tracking-widest">PERÍODO</span>
+          </div>
+
+          <div className="flex items-center gap-2 relative" ref={activePicker ? datePickerRef : null}>
+            <div className="relative">
+              <button
+                onClick={() => setActivePicker(activePicker === 'start' ? null : 'start')}
+                className="bg-transparent text-sm font-medium text-verde-botanico outline-none hover:bg-verde-botanico/5 px-2 py-1 rounded-lg transition-colors"
+              >
+                {moment(startDate).format('DD/MM/YYYY')}
+              </button>
+
+              {activePicker === 'start' && (
+                <div className="absolute top-full left-0 mt-2 z-[9999] bg-white border border-verde-botanico/20 shadow-2xl rounded-2xl p-4 animate-fade-in inline-block">
+                  <DayPicker
+                    mode="single"
+                    locale={ptBR}
+                    selected={new Date(startDate + 'T12:00:00')}
+                    onSelect={(date) => {
+                      if (date) {
+                        setStartDate(date.toISOString().split('T')[0]);
+                        setActivePicker(null);
+                      }
+                    }}
+                    className="m-0"
+                    classNames={{
+                      day_selected: "bg-verde-botanico text-white hover:bg-verde-botanico/90",
+                      day_today: "text-verde-botanico font-bold border-b-2 border-verde-botanico",
+                      head_cell: "text-verde-botanico/50 font-bold uppercase text-[10px] tracking-widest",
+                      button: "hover:bg-bege-calmo transition-colors rounded-lg",
+                      nav_button: "text-verde-botanico hover:bg-bege-calmo rounded-lg p-1",
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            <span className="text-verde-botanico/30">até</span>
+
+            <div className="relative">
+              <button
+                onClick={() => setActivePicker(activePicker === 'end' ? null : 'end')}
+                className="bg-transparent text-sm font-medium text-verde-botanico outline-none hover:bg-verde-botanico/5 px-2 py-1 rounded-lg transition-colors"
+              >
+                {moment(endDate).format('DD/MM/YYYY')}
+              </button>
+
+              {activePicker === 'end' && (
+                <div className="absolute top-full right-0 mt-2 z-[9999] bg-white border border-verde-botanico/20 shadow-2xl rounded-2xl p-4 animate-fade-in inline-block">
+                  <DayPicker
+                    mode="single"
+                    locale={ptBR}
+                    selected={new Date(endDate + 'T12:00:00')}
+                    onSelect={(date) => {
+                      if (date) {
+                        setEndDate(date.toISOString().split('T')[0]);
+                        setActivePicker(null);
+                      }
+                    }}
+                    className="m-0"
+                    classNames={{
+                      day_selected: "bg-verde-botanico text-white hover:bg-verde-botanico/90",
+                      day_today: "text-verde-botanico font-bold border-b-2 border-verde-botanico",
+                      head_cell: "text-verde-botanico/50 font-bold uppercase text-[10px] tracking-widest",
+                      button: "hover:bg-bege-calmo transition-colors rounded-lg",
+                      nav_button: "text-verde-botanico hover:bg-bege-calmo rounded-lg p-1",
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <button
+            className="p-2 hover:bg-verde-botanico/10 rounded-xl text-verde-botanico transition-colors shadow-sm bg-white"
+            title="Sincronizar dados"
+            onClick={() => window.location.reload()}
+          >
+            <Calendar size={14} className="animate-pulse" />
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -199,28 +313,28 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           title="Pacientes Ativos"
           value={activePatientsCount.toString()}
           icon={Users}
-          color="bg-teal-500"
+          color="bg-verde-botanico"
           subtext="Base de cadastros ativos"
         />
         <StatCard
           title="Faturamento Mensal"
           value={`R$ ${monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
           icon={DollarSign}
-          color="bg-emerald-500"
+          color="bg-verde-botanico/80"
           subtext="Total contabilizado este mês"
         />
         <StatCard
           title="Sessões Agendadas"
           value={scheduledSessionsCount.toString()}
           icon={CalendarCheck}
-          color="bg-purple-500"
+          color="bg-verde-botanico/60"
           subtext="Próximos 7 dias"
         />
         <StatCard
           title="Pendências Fiscais"
           value={pendingIssuesCount.toString()}
           icon={AlertTriangle}
-          color="bg-orange-400"
+          color="bg-verde-botanico/40"
           subtext="Despesas sem comprovante"
         />
       </div>
@@ -228,8 +342,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-semibold text-slate-800">Receitas x Despesas</h3>
-            <select className="text-xs border-gray-200 rounded-md text-slate-500 bg-gray-50 p-1">
+            <h3 className="text-lg font-semibold text-verde-botanico">Receitas x Despesas</h3>
+            <select className="text-xs border-gray-200 rounded-md text-verde-botanico bg-gray-50 p-1">
               <option>Últimos 6 meses</option>
             </select>
           </div>
@@ -240,12 +354,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
                 <Tooltip
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  cursor={{ fill: '#F7F5F0' }}
+                  contentStyle={{ borderRadius: '16px', border: '1px solid #5B6D5B/10', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', backgroundColor: 'rgba(255, 255, 255, 0.9)' }}
                   formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, '']}
                 />
-                <Bar dataKey="receitas" fill="#0d9488" radius={[4, 4, 0, 0]} name="Receitas" barSize={32} />
-                <Bar dataKey="despesas" fill="#ef4444" radius={[4, 4, 0, 0]} name="Despesas" barSize={32} />
+                <Bar dataKey="receitas" fill="#5B6D5B" radius={[6, 6, 0, 0]} name="Receitas" barSize={32} />
+                <Bar dataKey="despesas" fill="#8C7A6B" radius={[6, 6, 0, 0]} name="Despesas" barSize={32} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -254,17 +368,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         {/* Daily Appointments Card */}
         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col h-[450px]">
           <div className="flex flex-col mb-4">
-            <h3 className="text-lg font-semibold text-slate-800">Atendimentos do Dia</h3>
+            <h3 className="text-lg font-semibold text-verde-botanico">Atendimentos do Dia</h3>
 
             {/* Date Navigator */}
             <div className="flex items-center justify-between mt-2 bg-gray-50 rounded-lg p-1 border border-gray-100">
               <button
                 onClick={() => navigateDay('prev')}
-                className="p-1.5 hover:bg-white hover:shadow-sm rounded-md text-slate-500 transition-all"
+                className="p-1.5 hover:bg-white hover:shadow-sm rounded-md text-verde-botanico transition-all"
               >
                 <ChevronLeft size={16} />
               </button>
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <div className="flex items-center gap-2 text-sm font-medium text-verde-botanico">
                 <Calendar size={14} className="text-teal-600" />
                 <span className="capitalize">
                   {/* Using Native Intl for guaranteed Portuguese formatting */}
@@ -273,7 +387,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               </div>
               <button
                 onClick={() => navigateDay('next')}
-                className="p-1.5 hover:bg-white hover:shadow-sm rounded-md text-slate-500 transition-all"
+                className="p-1.5 hover:bg-white hover:shadow-sm rounded-md text-verde-botanico transition-all"
               >
                 <ChevronRight size={16} />
               </button>
@@ -282,7 +396,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
           <div className="space-y-3 flex-1 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
             {dailyAppointments.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2 opacity-60">
+              <div className="h-full flex flex-col items-center justify-center text-verde-botanico space-y-2 opacity-60">
                 <CalendarCheck size={32} />
                 <p className="text-sm text-center">Nenhum atendimento<br />para este dia.</p>
               </div>
@@ -293,13 +407,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                     {app.patientName.charAt(0)}
                   </div>
                   <div className="ml-3 flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-800 group-hover:text-teal-700 transition-colors truncate">{app.patientName}</p>
-                    <p className="text-xs text-slate-500 truncate">
+                    <p className="text-sm font-bold text-verde-botanico group-hover:text-teal-700 transition-colors truncate">{app.patientName}</p>
+                    <p className="text-xs text-verde-botanico truncate">
                       {app.status === 'confirmed' ? 'Confirmado' : 'Agendado'}
                     </p>
                   </div>
                   <div className="text-right pl-2">
-                    <div className="bg-gray-100 text-slate-600 px-2 py-1 rounded-md text-xs font-bold group-hover:bg-teal-50 group-hover:text-teal-700 transition-colors whitespace-nowrap">
+                    <div className="bg-gray-100 text-verde-botanico px-2 py-1 rounded-md text-xs font-bold group-hover:bg-teal-50 group-hover:text-teal-700 transition-colors whitespace-nowrap">
                       {app.time}
                     </div>
                   </div>
@@ -309,7 +423,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
           <button
             onClick={() => onNavigate('agenda')}
-            className="w-full mt-4 py-2.5 text-sm bg-gray-50 text-slate-600 font-medium hover:bg-gray-100 hover:text-slate-800 rounded-lg border border-gray-200 hover:-translate-y-1 transition-transform duration-300 ease-in-out"
+            className="w-full mt-4 py-2.5 text-sm bg-white text-verde-botanico font-bold hover:bg-bege-calmo rounded-xl border border-verde-botanico/10 hover:-translate-y-1 transition-all duration-300 shadow-sm"
           >
             Ver Agenda Completa
           </button>

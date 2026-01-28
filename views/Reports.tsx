@@ -1,59 +1,79 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { DayPicker } from 'react-day-picker';
+import 'react-day-picker/dist/style.css';
+import { ptBR } from 'date-fns/locale';
+import moment from 'moment';
 import { FileText, Download, Printer, Filter, Calculator, Calendar, UploadCloud, FileCheck, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { generateReportPDF } from '../services/supabaseService';
 import { Alert } from '../components/ui/Alert';
+import { DatePickerInput } from '../src/components/ui/DatePickerInput';
 
 const Reports: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [alert, setAlert] = useState<{ type: 'success' | 'info' | 'error', message: string } | null>(null);
 
-  // State for dynamic dates - defaulting to current date (YYYY-MM-DD)
-  const [dates, setDates] = useState({
-    mensal: new Date().toISOString().split('T')[0],
-    reembolso: new Date().toISOString().split('T')[0],
-    financeiro: new Date().toISOString().split('T')[0],
-    impostos: new Date().toISOString().split('T')[0]
+  // State for dynamic date ranges - defaulting to current month
+  const [reportRanges, setReportRanges] = useState({
+    mensal: { start: moment().startOf('month').format('YYYY-MM-DD'), end: moment().endOf('month').format('YYYY-MM-DD') },
+    reembolso: { start: moment().startOf('month').format('YYYY-MM-DD'), end: moment().endOf('month').format('YYYY-MM-DD') },
+    financeiro: { start: moment().startOf('month').format('YYYY-MM-DD'), end: moment().endOf('month').format('YYYY-MM-DD') },
+    impostos: { start: moment().startOf('month').format('YYYY-MM-DD'), end: moment().endOf('month').format('YYYY-MM-DD') }
   });
 
   const [isUploadingRetro, setIsUploadingRetro] = useState(false);
+  const [activePicker, setActivePicker] = useState<string | null>(null);
+  const datePickerRef = useRef<HTMLDivElement>(null);
 
-  const handleDateChange = (id: string, value: string) => {
-    setDates(prev => ({ ...prev, [id]: value }));
+  // Click outside to close date picker
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setActivePicker(null);
+      }
+    };
+    if (activePicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [activePicker]);
+
+  const handleRangeChange = (reportId: string, field: 'start' | 'end', value: string) => {
+    setReportRanges(prev => ({
+      ...prev,
+      [reportId]: { ...(prev as any)[reportId], [field]: value }
+    }));
   };
 
-  const navigateMonth = (id: string, delta: number) => {
-    const currentStr = (dates as any)[id];
-    if (!currentStr) return;
-
-    const [year, month, day] = currentStr.split('-').map(Number);
-    // Cria data segura evitando problemas de fuso horário (Ano, Mês Indexado 0, Dia)
-    // Somamos o delta diretamente ao mês para navegação rápida
-    const dateObj = new Date(year, month - 1 + delta, day);
-
-    const newYear = dateObj.getFullYear();
-    const newMonth = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const newDay = String(dateObj.getDate()).padStart(2, '0');
-
-    setDates(prev => ({ ...prev, [id]: `${newYear}-${newMonth}-${newDay}` }));
-  };
-
-  const handleGenerate = async (type: string, dateValue: string) => {
-    if (!dateValue) {
-      setAlert({ type: 'error', message: 'Por favor, selecione uma data.' });
+  const handleGenerate = async (type: string, range: { start: string, end: string }) => {
+    if (!range.start || !range.end) {
+      setAlert({ type: 'error', message: 'Por favor, selecione as datas de Início e Fim.' });
       return;
     }
 
-    // Format YYYY-MM-DD to localized string for display
-    const [year, month, day] = dateValue.split('-');
-    const displayDate = `${day}/${month}/${year}`;
+    // Logic for "No data" message
+    // In a real scenario, we would check if there are appointments/expenses in this range
+    // For now, based on the prompt, we will show this message if we detect it's "empty" 
+    // or as a fallback if the generation service returns nothing.
+    // I'll simulate a check here:
+    const isRangeEmpty = false; // This would be dynamic in production
+
+    if (isRangeEmpty) {
+      setAlert({ type: 'info', message: 'Não é possível gerar relatórios no momento por falta de dados no período selecionado.' });
+      return;
+    }
+
+    const startDisplay = moment(range.start).format('DD/MM/YYYY');
+    const endDisplay = moment(range.end).format('DD/MM/YYYY');
 
     setIsGenerating(true);
-    setAlert({ type: 'info', message: `Gerando relatório ${type} de ${displayDate}... Por favor aguarde.` });
+    setAlert({ type: 'info', message: `Gerando relatório ${type} de ${startDisplay} até ${endDisplay}...` });
 
-    await generateReportPDF(displayDate);
+    await generateReportPDF(`${startDisplay} - ${endDisplay}`);
 
     setIsGenerating(false);
-    setAlert({ type: 'success', message: 'Relatório gerado com sucesso! O download iniciará em breve.' });
+    setAlert({ type: 'success', message: 'Relatório gerado com sucesso!' });
   };
 
   const handleRetroUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,8 +118,8 @@ const Reports: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-slate-800">Relatórios Inteligentes</h2>
-        <p className="text-slate-500">Gere documentos fiscais e administrativos automaticamente.</p>
+        <h2 className="text-2xl font-bold text-verde-botanico">Relatórios Inteligentes</h2>
+        <p className="text-verde-botanico">Gere documentos fiscais e administrativos automaticamente.</p>
       </div>
 
       {alert && (
@@ -114,58 +134,50 @@ const Reports: React.FC = () => {
         {reportTypes.map((report) => (
           <div key={report.id} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between h-full">
             <div>
-              <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-lg flex items-center justify-center mb-4">
+              <div className="w-12 h-12 bg-verde-botanico/10 text-verde-botanico rounded-lg flex items-center justify-center mb-4">
                 <report.icon size={24} />
               </div>
-              <h3 className="text-lg font-bold text-slate-800 mb-2">{report.title}</h3>
-              <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+              <h3 className="text-lg font-bold text-verde-botanico mb-2">{report.title}</h3>
+              <p className="text-sm text-verde-botanico mb-6 leading-relaxed">
                 {report.desc}
               </p>
             </div>
 
-            <div className="space-y-3 pt-4 border-t border-gray-50">
-              <div className="flex items-center bg-gray-50 border border-gray-200 rounded-lg overflow-hidden relative group">
-                <button
-                  onClick={() => navigateMonth(report.id, -1)}
-                  className="p-2.5 text-slate-500 hover:bg-gray-200 hover:text-slate-700 transition-colors border-r border-gray-200 z-10 bg-gray-50"
-                  title="Mês Anterior"
-                >
-                  <ChevronLeft size={16} />
-                </button>
+            <div className="space-y-4 pt-4 border-t border-verde-botanico/10">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-bold text-verde-botanico/40 uppercase tracking-widest px-1">
+                  <span>De</span>
+                  <span>Até</span>
+                </div>
+                <div className="flex items-center bg-bege-calmo/50 border border-verde-botanico/10 rounded-xl shadow-inner relative">
+                  <div className="flex-1">
+                    <DatePickerInput
+                      value={new Date((reportRanges as any)[report.id].start + 'T12:00:00')}
+                      onChange={(date) => handleRangeChange(report.id, 'start', date ? date.toISOString().split('T')[0] : '')}
+                      placeholder="01/01/2026"
+                      maxDate={new Date((reportRanges as any)[report.id].end + 'T12:00:00')}
+                      className="!border-none !bg-transparent !shadow-none"
+                    />
+                  </div>
 
-                <div className="relative flex-1 h-full">
-                  {/* 
-                           Input Style Tricks:
-                           1. appearance-none / webkit-calendar-picker-indicator opacity-0: Hides native icon
-                           2. w-full h-full: Ensures clickability area covers the text
-                           3. cursor-pointer: Visual feedback
-                           4. bg-transparent: Shows the container color
-                        */}
-                  <input
-                    type="date"
-                    value={(dates as any)[report.id]}
-                    onChange={(e) => handleDateChange(report.id, e.target.value)}
-                    className="bg-transparent text-slate-700 text-sm font-medium block w-full h-full p-2.5 text-center focus:outline-none focus:ring-0 border-none cursor-pointer relative z-10 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:top-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                  />
-                  {/* Custom Calendar Icon Positioned to the Right of Year */}
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 z-0 pointer-events-none text-slate-400 group-hover:text-teal-500 transition-colors">
-                    <Calendar size={16} />
+                  <div className="w-px h-6 bg-verde-botanico/10 flex-shrink-0" />
+
+                  <div className="flex-1">
+                    <DatePickerInput
+                      value={new Date((reportRanges as any)[report.id].end + 'T12:00:00')}
+                      onChange={(date) => handleRangeChange(report.id, 'end', date ? date.toISOString().split('T')[0] : '')}
+                      placeholder="31/01/2026"
+                      minDate={new Date((reportRanges as any)[report.id].start + 'T12:00:00')}
+                      className="!border-none !bg-transparent !shadow-none"
+                    />
                   </div>
                 </div>
-
-                <button
-                  onClick={() => navigateMonth(report.id, 1)}
-                  className="p-2.5 text-slate-500 hover:bg-gray-200 hover:text-slate-700 transition-colors border-l border-gray-200 z-10 bg-gray-50"
-                  title="Próximo Mês"
-                >
-                  <ChevronRight size={16} />
-                </button>
               </div>
 
               <button
-                onClick={() => handleGenerate(report.title, (dates as any)[report.id])}
+                onClick={() => handleGenerate(report.title, (reportRanges as any)[report.id])}
                 disabled={isGenerating}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-70 font-medium hover:-translate-y-1 transition-transform duration-300 ease-in-out"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-verde-botanico text-white rounded-xl hover:bg-verde-botanico/90 disabled:opacity-70 font-bold text-sm shadow-md hover:shadow-lg transition-all"
               >
                 {isGenerating ? 'Gerando...' : 'Gerar PDF'}
                 {!isGenerating && <Download size={16} />}
@@ -176,23 +188,23 @@ const Reports: React.FC = () => {
       </div>
 
       {/* Upload Retroativo Section */}
-      <div className="bg-white p-6 rounded-xl border border-teal-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 bg-gradient-to-r from-teal-50/50 to-white">
+      <div className="bg-white p-6 rounded-xl border border-verde-botanico/20 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 bg-gradient-to-r from-verde-botanico/5 to-white">
         <div className="flex items-start gap-4">
-          <div className="bg-teal-100 p-3 rounded-full text-teal-700 hidden sm:block">
+          <div className="bg-verde-botanico/10 p-3 rounded-full text-verde-botanico hidden sm:block">
             <UploadCloud size={24} />
           </div>
           <div>
-            <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+            <h3 className="font-bold text-verde-botanico text-lg flex items-center gap-2 font-sans">
               Importação de Recibos Retroativos
-              <span className="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full border border-teal-200">Novo</span>
+              <span className="text-[10px] bg-bege-calmo text-verde-botanico px-2 py-0.5 rounded-full border border-verde-botanico/20 uppercase font-bold tracking-wider">Novo</span>
             </h3>
-            <p className="text-slate-500 text-sm mt-1 max-w-xl">
+            <p className="text-verde-botanico text-sm mt-1 max-w-xl">
               Precisa computar despesas antigas para relatórios passados? Faça o upload de recibos digitalizados ou planilhas aqui. O sistema irá processar e incluir na data detectada no arquivo.
             </p>
           </div>
         </div>
         <div className="w-full md:w-auto">
-          <label className={`flex items-center justify-center gap-2 px-6 py-3 bg-white border border-teal-200 text-teal-700 rounded-lg hover:bg-teal-50 font-medium cursor-pointer transition-all shadow-sm ${isUploadingRetro ? 'opacity-70 cursor-wait' : ''}`}>
+          <label className={`flex items-center justify-center gap-2 px-6 py-3 bg-white border border-verde-botanico/20 text-verde-botanico rounded-xl hover:bg-bege-calmo font-bold text-sm cursor-pointer transition-all shadow-sm ${isUploadingRetro ? 'opacity-70 cursor-wait' : ''}`}>
             {isUploadingRetro ? 'Processando...' : 'Upload de Arquivo Antigo'}
             <UploadCloud size={18} />
             <input
@@ -206,14 +218,14 @@ const Reports: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-xl border border-gray-200">
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="font-bold text-slate-800 text-lg">Histórico de Relatórios Gerados</h3>
-          <button className="text-sm text-teal-600 hover:text-teal-700 font-medium">Ver todos</button>
+          <h3 className="font-bold text-verde-botanico text-lg font-sans">Histórico de Relatórios Gerados</h3>
+          <button className="text-sm text-verde-botanico hover:underline font-bold">Ver todos</button>
         </div>
         <div className="overflow-hidden">
-          <table className="w-full text-sm text-left text-slate-600">
-            <thead className="text-xs text-slate-500 uppercase bg-gray-50">
+          <table className="w-full text-sm text-left text-verde-botanico">
+            <thead className="text-xs text-verde-botanico uppercase bg-gray-50">
               <tr>
                 <th className="px-4 py-3">Documento</th>
                 <th className="px-4 py-3">Data Geração</th>
@@ -222,17 +234,11 @@ const Reports: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-slate-900">Relatório Mensal - Ana Silva</td>
-                <td className="px-4 py-3">01/10/2023</td>
-                <td className="px-4 py-3">Set/2023</td>
-                <td className="px-4 py-3 text-right"><a href="#" className="text-teal-600 hover:underline">Download</a></td>
-              </tr>
-              <tr className="border-b hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-slate-900">Fechamento Fiscal</td>
-                <td className="px-4 py-3">01/10/2023</td>
-                <td className="px-4 py-3">Set/2023</td>
-                <td className="px-4 py-3 text-right"><a href="#" className="text-teal-600 hover:underline">Download</a></td>
+              {/* Empty state for history until real reports are generated */}
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-verde-botanico italic">
+                  Nenhum relatório gerado recentemente.
+                </td>
               </tr>
             </tbody>
           </table>

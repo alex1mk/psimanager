@@ -1,83 +1,151 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+@config "./tailwind.config.js";
+
 @layer base {
   :root {
-    /* ===== Core Colors ===== */
-    --background: 180 25% 96%;
-    --foreground: 210 20% 18%;
+    /* ===== Core Colors (Updated to Botanic Palette) ===== */
+    --background: #F7F5F0;
+    /* Bege Calmo */
+    --foreground: #5B6D5B;
+    /* Verde Botânico */
 
-    --card: 0 0% 100%;
-    --card-foreground: 210 20% 18%;
+    --card: #FFFFFF;
+    --card-foreground: #3D4A3D;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 210 20% 18%;
+    --popover: #FFFFFF;
+    --popover-foreground: #3D4A3D;
 
     /* ===== Brand ===== */
-    --primary: 188 55% 38%;
-    --primary-foreground: 0 0% 100%;
+    --primary: #5B6D5B;
+    /* Verde Botânico */
+    --primary-foreground: #F7F5F0;
 
-    --secondary: 186 35% 85%;
-    --secondary-foreground: 210 20% 20%;
+    --secondary: #E3E1DA;
+    /* Slightly darker Bege */
+    --secondary-foreground: #4A584A;
 
-    --accent: 190 45% 90%;
-    --accent-foreground: 210 20% 18%;
+    --accent: #E8EDE8;
+    --accent-foreground: #4A584A;
 
     /* ===== Neutral ===== */
-    --muted: 210 16% 92%;
-    --muted-foreground: 210 12% 45%;
+    --muted: #F2F1EC;
+    --muted-foreground: #718171;
 
-    --border: 210 16% 88%;
-    --input: 210 16% 90%;
-    --ring: 188 55% 38%;
+    --border: #D1D5D1;
+    --input: #DADDDA;
+    --ring: #5B6D5B;
 
     /* ===== Status ===== */
-    --success: 160 55% 40%;
-    --warning: 38 90% 55%;
-    --destructive: 0 70% 55%;
-    --destructive-foreground: 0 0% 100%;
+    --success: #3D8C3D;
+    --warning: #D97706;
+    --destructive: #EF4444;
+    --destructive-foreground: #FFFFFF;
 
     /* ===== Radius ===== */
     --radius: 0.75rem;
   }
 
   .dark {
-    --background: 210 20% 10%;
-    --foreground: 0 0% 96%;
+    --background: #1A1F1A;
+    --foreground: #F7F5F0;
 
-    --card: 210 18% 14%;
-    --card-foreground: 0 0% 96%;
+    --card: #242924;
+    --card-foreground: #F7F5F0;
 
-    --popover: 210 18% 14%;
-    --popover-foreground: 0 0% 96%;
+    --popover: #242924;
+    --popover-foreground: #F7F5F0;
 
-    --primary: 188 55% 45%;
-    --primary-foreground: 210 20% 10%;
+    --primary: #6B7D6B;
+    --primary-foreground: #1A1F1A;
 
-    --secondary: 210 15% 22%;
-    --secondary-foreground: 0 0% 96%;
+    --secondary: #2D332D;
+    --secondary-foreground: #F7F5F0;
 
-    --accent: 210 15% 24%;
-    --accent-foreground: 0 0% 96%;
+    --accent: #343D34;
+    --accent-foreground: #F7F5F0;
 
-    --muted: 210 15% 20%;
-    --muted-foreground: 210 10% 65%;
+    --muted: #2A302A;
+    --muted-foreground: #A1A9A1;
 
-    --border: 210 15% 24%;
-    --input: 210 15% 26%;
-    --ring: 188 55% 45%;
+    --border: #3A423A;
+    --input: #3E463E;
+    --ring: #6B7D6B;
+  }
+}
 
-    --success: 160 55% 45%;
-    --warning: 38 90% 60%;
-    --destructive: 0 70% 60%;
-    --destructive-foreground: 0 0% 100%;
+@layer base {
+  * {
+    border-color: var(--border);
   }
 
-  /* ===== Base Reset ===== */
-  * {
-    @apply border-border;
+  body,
+  input,
+  select,
+  textarea,
+  button,
+  .rbc-calendar {
+    font-family: 'Inter', sans-serif !important;
   }
 
   body {
-    @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    @apply bg-background text-verde-botanico;
     -webkit-font-smoothing: antialiased;
   }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.025em;
+  }
+
+  .font-display {
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 700 !important;
+  }
+}
+
+@theme {
+  --color-verde-botanico: #5B6D5B;
+  --color-bege-calmo: #F7F5F0;
+
+  --font-display: "Playfair Display", serif;
+  --font-serif: "Playfair Display", serif;
+  --font-sans: "Inter", sans-serif;
+}
+
+@layer utilities {
+  .rbc-month-view {
+    border: 1px solid rgba(91, 109, 91, 0.1) !important;
+    border-radius: 1rem;
+    overflow: hidden;
+    border-collapse: collapse !important;
+  }
+
+  .rbc-month-row {
+    margin: 0 !important;
+    border-top: 1px solid rgba(91, 109, 91, 0.1) !important;
+  }
+
+  .rbc-day-bg {
+    border-left: 1px solid rgba(91, 109, 91, 0.1) !important;
+  }
+
+  .rbc-day-bg:first-child {
+    border-left: none !important;
+  }
+
+  .rbc-header {
+    border-bottom: 1px solid rgba(91, 109, 91, 0.1) !important;
+  }
+}
+
+@utility hover-jump {
+  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+  @apply hover:scale-105 hover:shadow-lg;
 }

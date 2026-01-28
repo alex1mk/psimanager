@@ -1,0 +1,15 @@
+# Memória e Regras do Projeto PsiManager
+
+## 1. Padrões de Dados e Backend
+* **Formatação de Telefone**: TODO número de telefone de paciente DEVE ser salvo e enviado com o prefixo `+55` (Brasil). Caso o usuário esqueça, o sistema deve tratar a string para garantir esse formato antes de disparar para a Twilio.
+* **Fluxo de Agendamento**: Ao criar um novo registro na tabela `appointments`, o sistema deve disparar automaticamente o e-mail via Resend e o WhatsApp via Twilio contendo o link de confirmação da Edge Function.
+* **Sincronização**: A confirmação do paciente deve acionar a criação de um evento no Google Calendar usando a Service Account configurada.
+
+## 2. Design System e UI
+* **Paleta de Cores**: Utilizar tons de verde e branco conforme estabelecido na visualização principal da Agenda.
+* **Componentes**: Manter o padrão de cards arredondados e botões com estilo "shadcn/ui" ou similar, seguindo a estética do Dashboard e da Agenda atual.
+* **Feedback Visual**: Sempre exibir um sinal de "check" ou mudança de cor nos agendamentos confirmados na visualização mensal.
+
+## 3. Comportamento do Agente
+* Sempre verifique os "Secrets" do Supabase antes de sugerir mudanças em integrações externas (Twilio, Resend, Google).
+* Ao gerar código novo, certifique-se de que ele não quebra a estrutura de pastas atual (`psimanager/src/components`, `psimanager/supabase/functions`).

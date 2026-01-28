@@ -73,14 +73,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       `}</style>
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="w-16 h-16 bg-[#004D40] rounded-2xl flex items-center justify-center shadow-lg transform -rotate-6">
+          <div className="w-16 h-16 bg-[#5B6D5B] rounded-2xl flex items-center justify-center shadow-lg transform -rotate-6">
             <span className="text-white font-bold text-3xl">P</span>
           </div>
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-[#004D40] tracking-tight">
+        <h2 className="mt-6 text-center text-3xl font-extrabold text-[#5B6D5B] tracking-tight">
           PsiManager
         </h2>
-        <p className="mt-2 text-center text-sm text-slate-600">
+        <p className="mt-2 text-center text-sm text-verde-botanico">
           Gestão Clínica Inteligente & Humanizada
         </p>
       </div>
@@ -89,12 +89,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <div className="bg-white py-8 px-4 shadow-xl shadow-slate-200/50 sm:rounded-2xl sm:px-10 border border-gray-100">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+              <label htmlFor="email" className="block text-sm font-medium text-verde-botanico">
                 E-mail Profissional
               </label>
               <div className="mt-1 relative rounded-md shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-400" />
+                  <Mail className="h-5 w-5 text-verde-botanico" />
                 </div>
                 <input
                   id="email"
@@ -104,19 +104,19 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="focus:ring-[#004D40] focus:border-[#004D40] block w-full pl-10 sm:text-sm border-gray-300 rounded-lg p-3 border bg-white text-slate-800"
+                  className="focus:ring-[#5B6D5B] focus:border-[#5B6D5B] block w-full pl-10 sm:text-sm border-gray-300 rounded-lg p-3 border bg-white text-verde-botanico"
                   placeholder="seu@email.com"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+              <label htmlFor="password" className="block text-sm font-medium text-verde-botanico">
                 Senha
               </label>
               <div className="mt-1 relative rounded-md shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-400" />
+                  <Lock className="h-5 w-5 text-verde-botanico" />
                 </div>
                 <input
                   id="password"
@@ -126,7 +126,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="focus:ring-[#004D40] focus:border-[#004D40] block w-full pl-10 sm:text-sm border-gray-300 rounded-lg p-3 border bg-white text-slate-800"
+                  className="focus:ring-[#5B6D5B] focus:border-[#5B6D5B] block w-full pl-10 sm:text-sm border-gray-300 rounded-lg p-3 border bg-white text-verde-botanico"
                   placeholder="••••••••"
                 />
               </div>
@@ -164,9 +164,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   id="remember-me"
                   name="remember-me"
                   type="checkbox"
-                  className="h-4 w-4 text-[#004D40] focus:ring-[#004D40] border-gray-300 rounded bg-white shadow-none accent-[#004D40]"
+                  className="h-4 w-4 text-[#5B6D5B] focus:ring-[#5B6D5B] border-gray-300 rounded bg-white shadow-none accent-[#5B6D5B]"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600">
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-verde-botanico">
                   Lembrar-me
                 </label>
               </div>
@@ -175,7 +175,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <button
                   type="button"
                   onClick={handleForgotPassword}
-                  className="font-medium text-[#004D40] hover:text-[#00695C] border-0 bg-transparent p-0"
+                  className="font-medium text-[#5B6D5B] hover:text-[#5B6D5B] border-0 bg-transparent p-0"
                 >
                   Esqueceu a senha?
                 </button>
@@ -186,7 +186,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-full shadow-sm text-sm font-bold text-white bg-[#004D40] hover:bg-[#00695C] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#004D40] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-full shadow-sm text-sm font-bold text-white bg-[#5B6D5B] hover:bg-[#5B6D5B] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#5B6D5B] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <>
@@ -209,14 +209,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <div className="w-full border-t border-gray-200" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-slate-500">
+                <span className="px-2 bg-white text-verde-botanico">
                   Acesso seguro & Criptografado
                 </span>
               </div>
             </div>
             <div className="mt-6 grid grid-cols-1 gap-3">
-              <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-                <CheckCircle size={12} className="text-[#004D40]" />
+              <div className="flex items-center justify-center gap-2 text-xs text-verde-botanico">
+                <CheckCircle size={12} className="text-[#5B6D5B]" />
                 LGPD Compliance
               </div>
             </div>

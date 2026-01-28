@@ -28,7 +28,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div
-      className={`bg-[#599e4a] h-screen shadow-xl flex flex-col fixed left-0 top-0 z-10 hidden md:flex transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'
+      className={`bg-verde-botanico h-screen shadow-xl flex flex-col fixed left-0 top-0 z-10 hidden md:flex transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'
         }`}
     >
       {/* Header / Logo */}
@@ -55,13 +55,13 @@ const Sidebar: React.FC<SidebarProps> = ({
               title={isCollapsed ? item.label : ''}
               className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-transform duration-200 hover:-translate-y-1 ${isCollapsed ? 'justify-center' : ''
                 } ${isActive
-                  ? 'bg-white text-[#599e4a] shadow-md font-semibold'
-                  : 'text-white/90 hover:bg-white/20 hover:text-white'
+                  ? 'bg-bege-calmo text-verde-botanico shadow-md font-semibold'
+                  : 'text-white/90 hover:bg-white/10 hover:text-white'
                 }`}
             >
               <Icon
                 size={22}
-                className={`flex-shrink-0 ${isActive ? 'text-[#599e4a]' : 'text-white'}`}
+                className={`flex-shrink-0 ${isActive ? 'text-verde-botanico' : 'text-white'}`}
               />
               {!isCollapsed && (
                 <span className="animate-fade-in text-sm">{item.label}</span>

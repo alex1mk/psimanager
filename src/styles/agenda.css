@@ -1,0 +1,158 @@
+/* ============================================
+   ESTILOS DO CALENDÁRIO MENSAL - AGENDA
+   ============================================ */
+
+/* Container principal do calendário */
+.calendar-main-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    padding: 24px;
+    position: relative;
+    overflow: visible;
+}
+
+/* Cabeçalho dos dias da semana */
+.calendar-header {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background-color: #e5e7eb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px 8px 0 0;
+    overflow: hidden;
+    margin-bottom: -1px;
+}
+
+.calendar-header-cell {
+    background: #f9fafb;
+    padding: 12px 8px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 14px;
+    color: #4b5563;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Grid do calendário - CORRIGE DIVISÓRIAS */
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    /* Espaço uniforme entre células */
+    background-color: #e5e7eb;
+    /* Cor das linhas divisórias */
+    border: 1px solid #e5e7eb;
+    border-radius: 0 0 8px 8px;
+    overflow: hidden;
+}
+
+/* Células individuais do calendário */
+.calendar-cell {
+    background: white;
+    min-height: 100px;
+    padding: 8px;
+    position: relative;
+    transition: background-color 0.2s;
+}
+
+.calendar-cell:hover {
+    background-color: #f9fafb;
+}
+
+/* Número do dia */
+.calendar-day-number {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 4px;
+}
+
+/* Dias fora do mês atual */
+.calendar-cell-other-month {
+    background-color: #fafafa;
+    opacity: 0.5;
+}
+
+.calendar-cell-other-month .calendar-day-number {
+    color: #9ca3af;
+}
+
+/* Dia atual (hoje) */
+.calendar-cell-today {
+    background-color: #fef3c7;
+}
+
+.calendar-cell-today .calendar-day-number {
+    color: #92400e;
+    font-weight: 700;
+}
+
+/* Compromissos dentro da célula */
+.calendar-appointment {
+    font-size: 11px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
+    background-color: #d1fae5;
+    color: #065f46;
+    border-left: 3px solid #10b981;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.calendar-appointment:hover {
+    background-color: #a7f3d0;
+    transform: translateX(2px);
+}
+
+/* Imagem de fundo - Xícara de café */
+.calendar-coffee-bg {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 180px;
+    height: 180px;
+    opacity: 0.12;
+    /* Bem sutil para não atrapalhar leitura */
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Garantir que conteúdo fique sobre a imagem */
+.calendar-content {
+    position: relative;
+    z-index: 2;
+}
+
+/* Responsividade */
+@media (max-width: 1024px) {
+    .calendar-coffee-bg {
+        width: 140px;
+        height: 140px;
+        bottom: 15px;
+        right: 15px;
+    }
+
+    .calendar-cell {
+        min-height: 80px;
+    }
+}
+
+@media (max-width: 640px) {
+    .calendar-coffee-bg {
+        display: none;
+        /* Esconder em mobile */
+    }
+
+    .calendar-cell {
+        min-height: 60px;
+        padding: 4px;
+    }
+
+    .calendar-header-cell {
+        font-size: 12px;
+        padding: 8px 4px;
+    }
+}
