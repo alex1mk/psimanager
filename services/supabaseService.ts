@@ -175,7 +175,7 @@ export const getExpenses = async (): Promise<Expense[]> => {
     const { data, error } = await supabase
         .from('expenses')
         .select('*')
-        .order('expense_date', { ascending: false })
+        .order('date', { ascending: false })
 
     if (error) throw error
 
@@ -183,9 +183,9 @@ export const getExpenses = async (): Promise<Expense[]> => {
         id: e.id,
         description: e.description,
         amount: Number(e.amount),
-        date: e.expense_date,
+        date: e.date,
         category: e.category,
-        type: e.expense_type as ExpenseType,
+        type: e.type as ExpenseType,
         receiptUrl: e.receipt_url,
         merchantName: e.merchant_name
     }))
@@ -200,9 +200,9 @@ export const createExpense = async (expense: Expense): Promise<Expense> => {
             description: expense.description,
             merchant_name: expense.merchantName,
             amount: expense.amount,
-            expense_date: expense.date,
+            date: expense.date,
             category: expense.category,
-            expense_type: expense.type === ExpenseType.PF ? 'PF' : 'PJ',
+            type: expense.type === ExpenseType.PF ? 'PF' : 'PJ',
             receipt_url: expense.receiptUrl
         })
         .select()
@@ -214,9 +214,9 @@ export const createExpense = async (expense: Expense): Promise<Expense> => {
         id: data.id,
         description: data.description,
         amount: Number(data.amount),
-        date: data.expense_date,
+        date: data.date,
         category: data.category,
-        type: data.expense_type as ExpenseType,
+        type: data.type as ExpenseType,
         receiptUrl: data.receipt_url,
         merchantName: data.merchant_name
     }
@@ -231,9 +231,9 @@ export const updateExpense = async (expense: Expense): Promise<Expense> => {
             description: expense.description,
             merchant_name: expense.merchantName,
             amount: expense.amount,
-            expense_date: expense.date,
+            date: expense.date,
             category: expense.category,
-            expense_type: expense.type === ExpenseType.PF ? 'PF' : 'PJ',
+            type: expense.type === ExpenseType.PF ? 'PF' : 'PJ',
             receipt_url: expense.receiptUrl
         })
         .eq('id', expense.id)
@@ -246,9 +246,9 @@ export const updateExpense = async (expense: Expense): Promise<Expense> => {
         id: data.id,
         description: data.description,
         amount: Number(data.amount),
-        date: data.expense_date,
+        date: data.date,
         category: data.category,
-        type: data.expense_type as ExpenseType,
+        type: data.type as ExpenseType,
         receiptUrl: data.receipt_url,
         merchantName: data.merchant_name
     }

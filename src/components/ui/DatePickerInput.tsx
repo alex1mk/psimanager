@@ -81,6 +81,15 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
         }
     };
 
+    const [currentMonth, setCurrentMonth] = useState<Date>(value || new Date());
+
+    // Update internal calendar month when value changes
+    useEffect(() => {
+        if (value) {
+            setCurrentMonth(value);
+        }
+    }, [value]);
+
     return (
         <div ref={containerRef} className={`day-picker-container ${className}`}>
             <div className="relative">
@@ -119,11 +128,14 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
                 <div
                     ref={popoverRef}
                     className={`day-picker-popover ${popoverPos.vert} ${popoverPos.horiz}`}
+                    style={{ zIndex: 9999 }}
                 >
                     <DayPicker
                         mode="single"
                         selected={value}
                         onSelect={handleSelect}
+                        month={currentMonth}
+                        onMonthChange={setCurrentMonth}
                         locale={ptBR}
                         disabled={[
                             ...(minDate ? [{ before: minDate }] : []),

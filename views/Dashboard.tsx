@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { ptBR } from 'date-fns/locale';
-import { Users, DollarSign, CalendarCheck, AlertTriangle, Bell, X, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Users, DollarSign, CalendarCheck, AlertTriangle, Bell, X, ChevronLeft, ChevronRight, Calendar, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getAppointments, getExpenses } from '../services/supabaseService';
 import { patientService } from '../services/features/patients/patient.service';
@@ -347,21 +347,29 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               <option>Últimos 6 meses</option>
             </select>
           </div>
-          <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                <Tooltip
-                  cursor={{ fill: '#F7F5F0' }}
-                  contentStyle={{ borderRadius: '16px', border: '1px solid #5B6D5B/10', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', backgroundColor: 'rgba(255, 255, 255, 0.9)' }}
-                  formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, '']}
-                />
-                <Bar dataKey="receitas" fill="#5B6D5B" radius={[6, 6, 0, 0]} name="Receitas" barSize={32} />
-                <Bar dataKey="despesas" fill="#8C7A6B" radius={[6, 6, 0, 0]} name="Despesas" barSize={32} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="h-80 w-full relative">
+            {chartData.every(d => d.receitas === 0 && d.despesas === 0) ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-verde-botanico/40 border-2 border-dashed border-verde-botanico/10 rounded-xl bg-gray-50/50">
+                <BarChart3 size={48} className="mb-2 opacity-50" />
+                <p className="font-medium text-sm">Nenhum dado financeiro registrado</p>
+                <p className="text-xs">As receitas e despesas aparecerão aqui.</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                  <Tooltip
+                    cursor={{ fill: '#F7F5F0' }}
+                    contentStyle={{ borderRadius: '16px', border: '1px solid #5B6D5B/10', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', backgroundColor: 'rgba(255, 255, 255, 0.9)' }}
+                    formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, '']}
+                  />
+                  <Bar dataKey="receitas" fill="#5B6D5B" radius={[6, 6, 0, 0]} name="Receitas" barSize={32} />
+                  <Bar dataKey="despesas" fill="#8C7A6B" radius={[6, 6, 0, 0]} name="Despesas" barSize={32} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 

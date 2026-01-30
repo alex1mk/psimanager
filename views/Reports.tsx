@@ -9,7 +9,7 @@ import { Alert } from '../components/ui/Alert';
 import { DatePickerInput } from '../src/components/ui/DatePickerInput';
 
 const Reports: React.FC = () => {
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState<string | null>(null);
   const [alert, setAlert] = useState<{ type: 'success' | 'info' | 'error', message: string } | null>(null);
 
   // State for dynamic date ranges - defaulting to current month
@@ -67,12 +67,12 @@ const Reports: React.FC = () => {
     const startDisplay = moment(range.start).format('DD/MM/YYYY');
     const endDisplay = moment(range.end).format('DD/MM/YYYY');
 
-    setIsGenerating(true);
+    setGeneratingReport(type);
     setAlert({ type: 'info', message: `Gerando relatório ${type} de ${startDisplay} até ${endDisplay}...` });
 
     await generateReportPDF(`${startDisplay} - ${endDisplay}`);
 
-    setIsGenerating(false);
+    setGeneratingReport(null);
     setAlert({ type: 'success', message: 'Relatório gerado com sucesso!' });
   };
 
@@ -175,12 +175,12 @@ const Reports: React.FC = () => {
               </div>
 
               <button
-                onClick={() => handleGenerate(report.title, (reportRanges as any)[report.id])}
-                disabled={isGenerating}
+                onClick={() => handleGenerate(report.id, (reportRanges as any)[report.id])}
+                disabled={generatingReport !== null}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-verde-botanico text-white rounded-xl hover:bg-verde-botanico/90 disabled:opacity-70 font-bold text-sm shadow-md hover:shadow-lg transition-all"
               >
-                {isGenerating ? 'Gerando...' : 'Gerar PDF'}
-                {!isGenerating && <Download size={16} />}
+                {generatingReport === report.id ? 'Gerando...' : 'Gerar PDF'}
+                {generatingReport !== report.id && <Download size={16} />}
               </button>
             </div>
           </div>

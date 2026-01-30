@@ -40,6 +40,9 @@ const Expenses: React.FC = () => {
   const datePickerRef = useRef<HTMLDivElement>(null);
   const [expenseMonth, setExpenseMonth] = useState<Date>(currentExpense.date ? new Date(currentExpense.date) : new Date());
 
+  // OCR session total for automatic sum
+  const [ocrSessionTotal, setOcrSessionTotal] = useState<number>(0);
+
   // Click outside to close date picker
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -100,11 +103,26 @@ const Expenses: React.FC = () => {
         receiptUrl: '#' // Mock
       };
 
-      await createExpense(expense);
-      setExpenses(prev => [expense, ...prev]);
-      setAlert({ type: 'success', message: 'Recibo analisado e salvo com sucesso!' });
+      try {
+        await createExpense(expense);
+        setExpenses(prev => [expense, ...prev]);
+
+        // Update OCR session total
+        const newTotal = ocrSessionTotal + expense.amount;
+        setOcrSessionTotal(newTotal);
+
+        setAlert({
+          type: 'success',
+          message: `Recibo analisado e salvo! Valor: R$ ${expense.amount.toFixed(2)} | Total da sessão OCR: R$ ${newTotal.toFixed(2)}`
+        });
+      } catch (dbError: any) {
+        console.error("DB Error Saving Expense:", dbError);
+        setAlert({ type: 'error', message: `Erro ao salvar no banco: ${dbError.message || 'Erro desconhecido'}` });
+      }
+
     } catch (error) {
-      setAlert({ type: 'error', message: 'Falha ao analisar recibo.' });
+      console.error("OCR Analysis Error:", error);
+      setAlert({ type: 'error', message: 'Falha na análise do recibo (OCR).' });
     } finally {
       setIsUploading(false);
       e.target.value = '';
@@ -461,6 +479,7 @@ const Expenses: React.FC = () => {
                       <option>Transporte</option>
                       <option>Alimentação</option>
                       <option>Impostos</option>
+                      <option>Saúde</option>
                     </select>
                   </div>
 

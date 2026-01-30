@@ -22,13 +22,18 @@ export class PatientService extends BaseService {
     async create(patient: Patient): Promise<Patient> {
         await this.ensureAuthenticated()
 
+        // Map PaymentType to DB Constraint values
+        let dbPaymentType = 'Por Sessão';
+        if (patient.paymentType === PaymentType.MONTHLY) dbPaymentType = 'Mensal';
+        if (patient.paymentType === PaymentType.BIWEEKLY) dbPaymentType = 'Quinzenal';
+
         const { data, error } = await this.supabase
             .from(this.tableName)
             .insert({
                 name: patient.name,
                 email: patient.email,
                 phone: patient.phone,
-                payment_type: patient.paymentType,
+                payment_type: dbPaymentType,
                 fixed_day: patient.fixedDay,
                 fixed_time: patient.fixedTime,
                 status: patient.status
@@ -44,13 +49,18 @@ export class PatientService extends BaseService {
     async update(patient: Patient): Promise<Patient> {
         await this.ensureAuthenticated()
 
+        // Map PaymentType to DB Constraint values
+        let dbPaymentType = 'Por Sessão';
+        if (patient.paymentType === PaymentType.MONTHLY) dbPaymentType = 'Mensal';
+        if (patient.paymentType === PaymentType.BIWEEKLY) dbPaymentType = 'Quinzenal';
+
         const { data, error } = await this.supabase
             .from(this.tableName)
             .update({
                 name: patient.name,
                 email: patient.email,
                 phone: patient.phone,
-                payment_type: patient.paymentType,
+                payment_type: dbPaymentType,
                 fixed_day: patient.fixedDay,
                 fixed_time: patient.fixedTime,
                 status: patient.status

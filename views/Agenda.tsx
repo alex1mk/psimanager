@@ -16,6 +16,8 @@ import { Alert } from '../components/ui/Alert';
 moment.updateLocale('pt-br', {
   weekdaysShort: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 });
+moment.locale('pt-br'); // Force set locale globally
+
 
 const Agenda: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -308,9 +310,10 @@ const Agenda: React.FC = () => {
         {/* Date Navigator with Integrated Arrows */}
         <div className="flex items-center gap-3 border-l border-r border-verde-botanico/10 px-6 mx-2 relative">
           <span className="text-xs text-verde-botanico/50 font-bold uppercase tracking-widest">DATA</span>
-          <div className="flex items-center bg-white border border-verde-botanico/20 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center bg-white border border-verde-botanico/20 rounded-xl shadow-sm hover:shadow-md transition-all">
             <button
               onClick={() => {
+                console.log('Navigating to Prev Month');
                 const newDate = new Date(currentDate);
                 newDate.setMonth(newDate.getMonth() - 1);
                 setCurrentDate(newDate);
@@ -352,6 +355,7 @@ const Agenda: React.FC = () => {
             </div>
             <button
               onClick={() => {
+                console.log('Navigating to Next Month');
                 const newDate = new Date(currentDate);
                 newDate.setMonth(newDate.getMonth() + 1);
                 setCurrentDate(newDate);

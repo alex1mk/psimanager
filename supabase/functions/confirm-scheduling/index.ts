@@ -8,17 +8,35 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 const supabase = createClient(supabaseUrl, supabaseKey)
 
+// CORS headers for public access via email confirmation links
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+}
+
 serve(async (req) => {
+    // Handle CORS preflight requests
+    if (req.method === 'OPTIONS') {
+        return new Response('ok', { headers: corsHeaders })
+    }
+
     // Only allow GET requests for the confirmation link
     if (req.method !== 'GET') {
-        return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 })
+        return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+            status: 405,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
     }
 
     const url = new URL(req.url)
     const patientId = url.searchParams.get('patient_id')
 
     if (!patientId) {
-        return new Response("Erro: ID do paciente não fornecido.", { status: 400 })
+        return new Response("Erro: ID do paciente não fornecido.", {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' }
+        })
     }
 
     try {
@@ -30,11 +48,43 @@ serve(async (req) => {
             .single()
 
         if (fetchError || !patient) {
-            return new Response("Erro: Paciente não encontrado.", { status: 404 })
+            return new Response("Erro: Paciente não encontrado.", {
+                status: 404,
+                headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' }
+            })
         }
 
-        if (patient.status === 'active' || patient.status === 'confirmed') {
-            return new Response("Este agendamento já foi confirmado anteriormente.", { headers: { "Content-Type": "text/html" } })
+        // Check if there's already a confirmed appointment for this patient
+        const { data: existingAppointment } = await supabase
+            .from('appointments')
+            .select('id, scheduled_date')
+            .eq('patient_id', patientId)
+            .eq('status', 'confirmed')
+            .order('scheduled_date', { ascending: false })
+            .limit(1)
+            .single()
+
+        if (existingAppointment) {
+            return new Response(`
+              <html>
+                <head>
+                   <style>
+                     body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background-color: #fef3c7; color: #92400e; }
+                     .card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); text-align: center; }
+                     h1 { margin-bottom: 20px; color: #d97706; }
+                   </style>
+                </head>
+                <body>
+                  <div class="card">
+                    <h1>Presença Já Confirmada</h1>
+                    <p>Sua presença já foi confirmada anteriormente.</p>
+                    <p>Aguardamos você no horário agendado!</p>
+                  </div>
+                </body>
+              </html>
+            `, {
+                headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' }
+            })
         }
 
         // 2. Calculate Next Appointment Date
@@ -65,13 +115,22 @@ serve(async (req) => {
 
         // 5. Add to Google Calendar
         try {
+            console.log(`[Google Calendar] Attempting to create event for ${patient.name} on ${nextDate} at ${startTime}`)
             await addToGoogleCalendar(patient.name, nextDate, startTime)
         } catch (gError) {
             console.error("Google Calendar Error:", gError)
             // We don't fail the request if Calendar fails, just log it
         }
 
-        // 6. Return Success Page
+        // 6. Send WhatsApp Notification (Twilio)
+        try {
+            console.log(`[WhatsApp] Attempting to send confirmation to ${patient.phone}`)
+            await sendWhatsAppConfirmation(patient.name, patient.phone, nextDate, startTime)
+        } catch (wError) {
+            console.error("Twilio/WhatsApp Error:", wError)
+        }
+
+        // 7. Return Success Page
         return new Response(`
       <html>
         <head>
@@ -85,14 +144,15 @@ serve(async (req) => {
           <div class="card">
             <h1>Agendamento Confirmado!</h1>
             <p>Sua consulta foi agendada para <strong>${nextDate.split('-').reverse().join('/')} às ${startTime}</strong>.</p>
+            <p>Uma confirmação também foi enviada para seu WhatsApp.</p>
             <p>Obrigado, ${patient.name}.</p>
           </div>
         </body>
       </html>
-    `, { headers: { "Content-Type": "text/html" } })
+    `, { headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } })
 
     } catch (err) {
-        console.error(err)
+        console.error("Unhandled Edge Function Error:", err)
         return new Response("Erro interno no servidor.", { status: 500 })
     }
 })
@@ -166,13 +226,13 @@ async function addToGoogleCalendar(patientName: string, date: string, time: stri
             requestBody: {
                 summary: `Consulta - ${patientName}`,
                 description: 'Agendamento confirmado automaticamente via Supabase / PsiManager.',
-                start: { 
-                    dateTime: startDateTime, 
-                    timeZone: 'America/Sao_Paulo' 
+                start: {
+                    dateTime: startDateTime,
+                    timeZone: 'America/Sao_Paulo'
                 },
-                end: { 
-                    dateTime: endDateTime, 
-                    timeZone: 'America/Sao_Paulo' 
+                end: {
+                    dateTime: endDateTime,
+                    timeZone: 'America/Sao_Paulo'
                 },
                 colorId: '2', // Green (Sage)
                 reminders: {
@@ -189,4 +249,50 @@ async function addToGoogleCalendar(patientName: string, date: string, time: stri
         console.error("Critical Google Calendar error:", err)
         throw err // Re-throw to be caught by the outer try-catch
     }
+}
+
+async function sendWhatsAppConfirmation(name: string, phone: string, date: string, time: string) {
+    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
+    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN')
+    const fromNumber = Deno.env.get('TWILIO_WHATSAPP_NUMBER') // e.g. "whatsapp:+14155238886"
+
+    if (!accountSid || !authToken || !fromNumber) {
+        console.warn("Skipping WhatsApp: Twilio credentials not found.")
+        return
+    }
+
+    // Clean phone number: remove non-numeric, ensure +55 (BR) if missing
+    let cleanPhone = phone.replace(/\D/g, '')
+    if (!cleanPhone.startsWith('55') && cleanPhone.length > 9) {
+        cleanPhone = '55' + cleanPhone
+    }
+    const toNumber = `whatsapp:+${cleanPhone}`
+
+    const messageBody = `Olá ${name}, sua consulta foi confirmada para ${date.split('-').reverse().join('/')} às ${time}. Até lá!`
+
+    console.log(`Sending WhatsApp to ${toNumber}: ${messageBody}`)
+
+    const response = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': `Basic ${btoa(accountSid + ':' + authToken)}`,
+            },
+            body: new URLSearchParams({
+                To: toNumber,
+                From: fromNumber,
+                Body: messageBody,
+            }),
+        }
+    )
+
+    if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Twilio API Error: ${response.status} ${response.statusText} - ${errorText}`)
+    }
+
+    const data = await response.json()
+    console.log("WhatsApp sent! SID:", data.sid)
 }
