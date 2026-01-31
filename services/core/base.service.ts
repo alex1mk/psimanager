@@ -24,8 +24,10 @@ export abstract class BaseService {
      * Standardized error handler
      */
     protected handleError(error: any): never {
-        console.error(`[${this.tableName} Service Error]:`, error)
-        if (error.message) throw new Error(error.message)
-        throw error
+        const { parseSupabaseError, showErrorToast } = require('../../src/lib/error-handler')
+        const parsedError = parseSupabaseError(error)
+        console.error(`[${this.tableName} Service Error]:`, parsedError)
+        showErrorToast(error)
+        throw new Error(parsedError.message)
     }
 }

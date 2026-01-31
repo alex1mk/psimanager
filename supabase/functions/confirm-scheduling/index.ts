@@ -8,21 +8,24 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// CORS headers for public access via email confirmation links
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-};
-
 serve(async (req) => {
-  // Handle CORS preflight requests
+  const allowedOrigins = [
+    "https://psimanager.vercel.app",
+    ...(Deno.env.get("ENV") === "development" ? ["http://localhost:5173"] : []),
+  ];
+
+  const origin = req.headers.get("Origin") || "";
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Credentials": "true",
+  };
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Only allow GET requests for the confirmation link
   if (req.method !== "GET") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
@@ -32,16 +35,33 @@ serve(async (req) => {
 
   const url = new URL(req.url);
   const patientId = url.searchParams.get("patient_id");
+  const token = url.searchParams.get("token");
 
-  if (!patientId) {
-    return new Response("Erro: ID do paciente não fornecido.", {
+  if (!patientId || !token) {
+    return new Response(JSON.stringify({ error: "Parâmetros inválidos." }), {
       status: 400,
-      headers: { ...corsHeaders, "Content-Type": "text/plain; charset=utf-8" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Validar token HMAC
+  const secret = Deno.env.get("CONFIRMATION_SECRET") || "your-secret-key-here";
+  const expectedToken = await crypto.subtle
+    .digest("SHA-256", new TextEncoder().encode(`${patientId}:${secret}`))
+    .then((buffer) =>
+      Array.from(new Uint8Array(buffer))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join(""),
+    );
+
+  if (token !== expectedToken) {
+    return new Response(JSON.stringify({ error: "Token inválido." }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
   try {
-    // 1. Fetch Patient Data
     const { data: patient, error: fetchError } = await supabase
       .from("patients")
       .select("*")
@@ -51,14 +71,10 @@ serve(async (req) => {
     if (fetchError || !patient) {
       return new Response("Erro: Paciente não encontrado.", {
         status: 404,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "text/plain; charset=utf-8",
-        },
+        headers: { ...corsHeaders, "Content-Type": "text/plain; charset=utf-8" },
       });
     }
 
-    // Check if there's already a confirmed appointment for this patient
     const { data: existingAppointment } = await supabase
       .from("appointments")
       .select("id, scheduled_date")
@@ -70,149 +86,177 @@ serve(async (req) => {
 
     if (existingAppointment) {
       return new Response(
-        `
-              <!DOCTYPE html>
-              <html lang="pt-BR">
-                <head>
-                   <meta charset="UTF-8">
-                   <style>
-                     body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background-color: #fef3c7; color: #92400e; margin: 0; }
-                     .card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); text-align: center; }
-                     h1 { margin-bottom: 20px; color: #d97706; }
-                   </style>
-                </head>
-                <body>
-                  <div class="card">
-                    <h1>Presença Já Confirmada</h1>
-                    <p>Sua presença já foi confirmada anteriormente.</p>
-                    <p>Aguardamos você no horário agendado!</p>
-                  </div>
-                </body>
-              </html>
-            `,
-        {
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "text/html; charset=utf-8",
-          },
-        },
+        `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Presença Já Confirmada</title>
+  <style>
+    body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background-color: #fef3c7; color: #92400e; margin: 0; }
+    .card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); text-align: center; }
+    h1 { margin-bottom: 20px; color: #d97706; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Presença Já Confirmada</h1>
+    <p>Sua presença já foi confirmada anteriormente.</p>
+    <p>Aguardamos você no horário agendado!</p>
+  </div>
+</body>
+</html>`,
+        { headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" } }
       );
     }
 
-    // 2. Calculate Next Appointment Date
-    // Simplification: We assume next occurrence of the fixedDay
-    const nextDate = calculateNextDate(patient.fixed_day);
-    const startTime = patient.fixed_time; // e.g., "14:00"
+    const nextDate = calculateNextDate(patient.fixed_day || patient.fixedDay || "");
+    const startTime = patient.fixed_time || patient.fixedTime || "Horário a definir";
 
-    // 3. Create Appointment in DB
     const { error: appError } = await supabase.from("appointments").insert({
       patient_id: patient.id,
-      scheduled_date: nextDate, // YYYY-MM-DD
-      scheduled_time: startTime,
+      scheduled_date: nextDate,
+      scheduled_time: startTime === "Horário a definir" ? "08:00" : startTime,
       status: "confirmed",
       source: "internal",
     });
 
     if (appError) console.error("DB Error (Appointments):", appError);
 
-    // 4. Update Patient Status
     const { error: updateError } = await supabase
       .from("patients")
-      .update({ status: "active" }) // or 'confirmed' if you added that status
+      .update({ status: "active" })
       .eq("id", patientId);
 
     if (updateError) console.error("DB Error (Patient):", updateError);
 
-    // 5. Add to Google Calendar
-    try {
-      console.log(
-        `[Google Calendar] Attempting to create event for ${patient.name} on ${nextDate} at ${startTime}`,
-      );
-      await addToGoogleCalendar(patient.name, nextDate, startTime);
-    } catch (gError) {
-      console.error("Google Calendar Error:", gError);
-      // We don't fail the request if Calendar fails, just log it
+    if (startTime !== "Horário a definir") {
+      const calendarResult = await addToGoogleCalendar(patient.name, nextDate, startTime);
+      if (calendarResult.success) {
+        console.log("[Sync] ✅ Google Calendar sincronizado! Event ID:", calendarResult.eventId);
+      } else {
+        console.error("[Sync] ❌ Google Calendar falhou:", calendarResult.error);
+      }
     }
 
-    // 6. Send WhatsApp Notification (Twilio)
-    try {
-      console.log(
-        `[WhatsApp] Attempting to send confirmation to ${patient.phone}`,
-      );
-      await sendWhatsAppConfirmation(
-        patient.name,
-        patient.phone,
-        nextDate,
-        startTime,
-      );
-    } catch (wError) {
-      console.error("Twilio/WhatsApp Error:", wError);
+    const whatsappResult = await sendWhatsAppConfirmation(patient.name, patient.phone, nextDate, startTime);
+    if (whatsappResult.success) {
+      console.log("[Sync] ✅ WhatsApp enviado! SID:", whatsappResult.sid);
+    } else {
+      console.error("[Sync] ❌ WhatsApp falhou:", whatsappResult.error);
     }
 
-    // 7. Return Success Page
+    const [year, month, day] = nextDate.split("-");
+    const formattedDate = `${day}/${month}/${year}`;
+
     return new Response(
-      `
-      <!DOCTYPE html>
-      <html lang="pt-BR">
-        <head>
-           <meta charset="UTF-8">
-           <style>
-             body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background-color: #f0fdf4; color: #166534; margin: 0; }
-             .card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); text-align: center; max-width: 400px; width: 90%; }
-             h1 { margin-bottom: 20px; font-size: 24px; }
-             p { line-height: 1.5; margin: 10px 0; }
-           </style>
-        </head>
-        <body>
-          <div class="card">
-            <h1>Agendamento Confirmado!</h1>
-            <p>Sua consulta foi agendada para <strong>${nextDate.split("-").reverse().join("/")} às ${startTime}</strong>.</p>
-            <p>Uma confirmação também foi enviada para seu WhatsApp.</p>
-            <p>Obrigado, ${patient.name}.</p>
-          </div>
-        </body>
-      </html>
-    `,
+      `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirmação de Agendamento</title>
+  <style>
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      min-height: 100vh; 
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      margin: 0;
+      padding: 20px;
+    }
+    .card { 
+      background: white; 
+      padding: 3rem; 
+      border-radius: 20px; 
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      text-align: center; 
+      max-width: 500px; 
+      width: 100%;
+    }
+    .checkmark {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: inline-block;
+      background: #10b981;
+      color: white;
+      font-size: 48px;
+      line-height: 80px;
+      margin-bottom: 1.5rem;
+    }
+    h1 { 
+      margin-bottom: 1rem; 
+      font-size: 28px; 
+      color: #166534; 
+      font-weight: 700;
+    }
+    p { 
+      line-height: 1.8; 
+      margin: 1rem 0;
+      color: #374151;
+      font-size: 16px;
+    }
+    .highlight {
+      background: #f0fdf4;
+      padding: 1rem;
+      border-radius: 8px;
+      margin: 1.5rem 0;
+      border-left: 4px solid #10b981;
+    }
+    strong {
+      color: #166534;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="checkmark">✓</div>
+    <h1>Agendamento Confirmado!</h1>
+    <div class="highlight">
+      <p><strong>📅 Data:</strong> ${formattedDate}</p>
+      <p><strong>🕐 Horário:</strong> ${startTime}</p>
+    </div>
+    <p>Uma confirmação também foi enviada para seu WhatsApp.</p>
+    <p><strong>Obrigado, ${patient.name}!</strong></p>
+  </div>
+</body>
+</html>`,
       {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "text/html; charset=utf-8",
-        },
-      },
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" }
+      }
     );
   } catch (err) {
     console.error("Unhandled Edge Function Error:", err);
     return new Response(
-      `
-      <!DOCTYPE html>
-      <html lang="pt-BR">
-        <head>
-          <meta charset="UTF-8">
-          <style>
-            body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background-color: #fef2f2; color: #991b1b; margin: 0; }
-            .card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); text-align: center; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <h1>Erro no Processamento</h1>
-            <p>Não foi possível confirmar seu agendamento. Por favor, tente novamente ou entre em contato diretamente.</p>
-          </div>
-        </body>
-      </html>
-    `,
+      `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Erro no Processamento</title>
+  <style>
+    body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background-color: #fef2f2; color: #991b1b; margin: 0; }
+    .card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Erro no Processamento</h1>
+    <p>Não foi possível confirmar seu agendamento. Por favor, tente novamente ou entre em contato diretamente.</p>
+  </div>
+</body>
+</html>`,
       {
         status: 500,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "text/html; charset=utf-8",
-        },
-      },
+        headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
+      }
     );
   }
 });
-
-// --- Helper Functions ---
 
 function calculateNextDate(dayName: string): string {
   const daysMap: { [key: string]: number } = {
@@ -230,20 +274,11 @@ function calculateNextDate(dayName: string): string {
     Sábado: 6,
   };
   const targetDay = daysMap[dayName];
-  if (targetDay === undefined) return new Date().toISOString().split("T")[0]; // Fallback to today
+  if (targetDay === undefined) return new Date().toISOString().split("T")[0];
 
   const today = new Date();
   const resultDate = new Date(today);
-
-  // Calculate days until next occurrence
-  // If today is Monday(1) and we want Monday(1), we default to *next* week or today?
-  // Usually confirmed means upcoming. Let's say if today is the day, we schedule for next week,
-  // or if the time has passed... for simplicity, let's just find the next occurrence index.
   resultDate.setDate(today.getDate() + ((targetDay + 7 - today.getDay()) % 7));
-
-  // If calculated date is today, check time? Assuming simplified "future date" logic:
-  // If result is today, invoke next week logic if you want strict future.
-  // For now, allow today.
 
   return resultDate.toISOString().split("T")[0];
 }
@@ -251,52 +286,50 @@ function calculateNextDate(dayName: string): string {
 async function addToGoogleCalendar(
   patientName: string,
   date: string,
-  time: string,
-) {
-  const serviceAccountKey = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY"); // JSON string
-  const calendarId = Deno.env.get("GOOGLE_CALENDAR_ID"); // 'primary' or specific email
+  time: string
+): Promise<{ success: boolean; eventId?: string; error?: string }> {
+  const serviceAccountKey = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY");
+  const calendarId = Deno.env.get("GOOGLE_CALENDAR_ID");
 
   if (!serviceAccountKey || !calendarId) {
-    console.warn("Skipping Google Calendar: Credentials not found.");
-    return;
+    const msg = "Google Calendar não configurado (faltam variáveis de ambiente)";
+    console.warn("[Google Calendar]", msg);
+    return { success: false, error: msg };
   }
 
   try {
     const credentials = JSON.parse(serviceAccountKey);
+
+    if (!credentials.client_email || !credentials.private_key) {
+      throw new Error("Service Account JSON inválido (falta client_email ou private_key)");
+    }
+
     const auth = new JWT({
       email: credentials.client_email,
-      key: credentials.private_key,
+      key: credentials.private_key.replace(/\\n/g, "\n"),
       scopes: ["https://www.googleapis.com/auth/calendar"],
     });
 
     const calendar = google.calendar({ version: "v3", auth });
 
-    // Calculate End Time (assume 1h duration)
-    // We construct the string directly to avoid UTC conversion shifts in the SDK
-    const startDateTime = `${date}T${time}:00`;
     const [hours, minutes] = time.split(":").map(Number);
-    let endHours = hours + 1;
-    let endDateStr = date;
+    const endHours = hours + 1;
 
-    // Handle day overflow if 23:00 -> 00:00 (unlikely for therapy but good practice)
-    if (endHours >= 24) {
-      endHours = 0;
-      const nextDay = new Date(date);
-      nextDay.setDate(nextDay.getDate() + 1);
-      endDateStr = nextDay.toISOString().split("T")[0];
-    }
-    const endDateTime = `${endDateStr}T${String(endHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00`;
+    const startDateTime = `${date}T${time}:00-03:00`;
+    const endDateTime = `${date}T${String(endHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00-03:00`;
 
-    console.log(
-      `Creating calendar event for ${patientName} at ${startDateTime}`,
-    );
+    console.log("[Google Calendar] Creating event:", {
+      patient: patientName,
+      start: startDateTime,
+      end: endDateTime,
+      calendar: calendarId,
+    });
 
-    await calendar.events.insert({
+    const response = await calendar.events.insert({
       calendarId: calendarId,
       requestBody: {
         summary: `Consulta - ${patientName}`,
-        description:
-          "Agendamento confirmado automaticamente via Supabase / PsiManager.",
+        description: `Agendamento confirmado via PsiManager\nPaciente: ${patientName}`,
         start: {
           dateTime: startDateTime,
           timeZone: "America/Sao_Paulo",
@@ -305,7 +338,7 @@ async function addToGoogleCalendar(
           dateTime: endDateTime,
           timeZone: "America/Sao_Paulo",
         },
-        colorId: "2", // Green (Sage)
+        colorId: "2",
         reminders: {
           useDefault: false,
           overrides: [
@@ -315,10 +348,23 @@ async function addToGoogleCalendar(
         },
       },
     });
-    console.log("Calendar event created successfully!");
-  } catch (err) {
-    console.error("Critical Google Calendar error:", err);
-    throw err; // Re-throw to be caught by the outer try-catch
+
+    if (response.status !== 200 && response.status !== 201) {
+      throw new Error(`API retornou status ${response.status}`);
+    }
+
+    if (!response.data.id) {
+      throw new Error("API não retornou event ID");
+    }
+
+    console.log("[Google Calendar] ✅ Event criado! ID:", response.data.id);
+    console.log("[Google Calendar] Link:", response.data.htmlLink);
+
+    return { success: true, eventId: response.data.id };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error("[Google Calendar] ❌ Erro:", errorMsg);
+    return { success: false, error: errorMsg };
   }
 }
 
@@ -326,51 +372,104 @@ async function sendWhatsAppConfirmation(
   name: string,
   phone: string,
   date: string,
-  time: string,
-) {
+  time: string
+): Promise<{ success: boolean; sid?: string; error?: string }> {
   const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
   const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-  const fromNumber = Deno.env.get("TWILIO_WHATSAPP_NUMBER"); // e.g. "whatsapp:+14155238886"
+  const fromNumber = Deno.env.get("TWILIO_WHATSAPP_NUMBER");
 
   if (!accountSid || !authToken || !fromNumber) {
-    console.warn("Skipping WhatsApp: Twilio credentials not found.");
-    return;
+    const msg = "Twilio não configurado";
+    console.warn("[WhatsApp]", msg);
+    return { success: false, error: msg };
   }
 
-  // Clean phone number: remove non-numeric, ensure +55 (BR) if missing
+  console.log("[WhatsApp] Telefone recebido do DB:", phone);
+
   let cleanPhone = phone.replace(/\D/g, "");
-  if (!cleanPhone.startsWith("55") && cleanPhone.length > 9) {
+  console.log("[WhatsApp] Após limpeza:", cleanPhone);
+
+  if (cleanPhone.length === 11) {
+    cleanPhone = "55" + cleanPhone;
+  } else if (cleanPhone.length === 10) {
+    cleanPhone = "55" + cleanPhone;
+  } else if (cleanPhone.length === 13 && cleanPhone.startsWith("55")) {
+    // Já tem 55
+  } else if (cleanPhone.length === 12 && !cleanPhone.startsWith("55")) {
     cleanPhone = "55" + cleanPhone;
   }
-  const toNumber = `whatsapp:+${cleanPhone}`;
 
-  const messageBody = `Olá ${name}, sua consulta foi confirmada para ${date.split("-").reverse().join("/")} às ${time}. Até lá!`;
+  console.log("[WhatsApp] Após adicionar DDI:", cleanPhone);
 
-  console.log(`Sending WhatsApp to ${toNumber}: ${messageBody}`);
-
-  const response = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${btoa(accountSid + ":" + authToken)}`,
-      },
-      body: new URLSearchParams({
-        To: toNumber,
-        From: fromNumber,
-        Body: messageBody,
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Twilio API Error: ${response.status} ${response.statusText} - ${errorText}`,
-    );
+  if (cleanPhone.length !== 13 && cleanPhone.length !== 12) {
+    const error = `Telefone inválido: original="${phone}", limpo="${cleanPhone}" (esperado 12-13 dígitos)`;
+    console.error("[WhatsApp]", error);
+    return { success: false, error };
   }
 
-  const data = await response.json();
-  console.log("WhatsApp sent! SID:", data.sid);
+  const toNumber = `whatsapp:+${cleanPhone}`;
+  console.log("[WhatsApp] Formato final para Twilio:", toNumber);
+
+  const [year, month, day] = date.split("-");
+  const formattedDate = `${day}/${month}/${year}`;
+
+  const messageBody = `Olá ${name}! 👋
+
+Sua consulta foi confirmada:
+📅 ${formattedDate}
+🕐 ${time}
+
+Aguardamos você!
+
+_Mensagem automática - PsiManager_`;
+
+  console.log("[WhatsApp] Enviando mensagem...");
+  console.log("[WhatsApp] De:", fromNumber);
+  console.log("[WhatsApp] Para:", toNumber);
+
+  try {
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${btoa(accountSid + ":" + authToken)}`,
+        },
+        body: new URLSearchParams({
+          To: toNumber,
+          From: fromNumber,
+          Body: messageBody,
+        }),
+      }
+    );
+
+    const responseData = await response.json();
+    console.log("[WhatsApp] Resposta Twilio:", JSON.stringify(responseData, null, 2));
+
+    if (!response.ok) {
+      console.error("[WhatsApp] ❌ Erro na API:", responseData);
+
+      let errorMessage = `HTTP ${response.status}`;
+
+      if (responseData.code === 21211) {
+        errorMessage = `❌ Número ${toNumber} não validou o Sandbox!\n\nSOLUÇÃO:\n1. Abra WhatsApp no celular\n2. Envie mensagem para: +1 415 523 8886\n3. Escreva: join inch-crowd\n4. Aguarde confirmação\n5. Tente novamente`;
+      } else if (responseData.code === 63016) {
+        errorMessage = "❌ Número não pode receber WhatsApp Business";
+      } else if (responseData.code === 21408) {
+        errorMessage = "❌ Permissão negada - verifique número FROM no Twilio";
+      } else if (responseData.message) {
+        errorMessage = responseData.message;
+      }
+
+      return { success: false, error: errorMessage };
+    }
+
+    console.log("[WhatsApp] ✅ Sucesso! SID:", responseData.sid);
+    return { success: true, sid: responseData.sid };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error("[WhatsApp] ❌ Erro de conexão:", errorMsg);
+    return { success: false, error: errorMsg };
+  }
 }

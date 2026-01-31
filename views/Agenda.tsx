@@ -5,8 +5,18 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import moment from "moment";
-import "moment/locale/pt-br";
+import {
+  format,
+  parse,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  isSameMonth,
+  isToday,
+  parseISO,
+} from "date-fns";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -28,38 +38,22 @@ import {
 } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
-import { ptBR } from "date-fns/locale";
-import {
-  format,
-  parse,
-  startOfMonth,
-  endOfMonth,
-  startOfWeek,
-  endOfWeek,
-  eachDayOfInterval,
-  isSameMonth,
-  isToday,
-} from "date-fns";
 import { DatePickerInput } from "../src/components/ui/DatePickerInput";
 import "../src/styles/agenda.css";
 import { Appointment, Patient } from "../types";
+import { appointmentService } from "../services/features/appointments/appointment.service";
+import { patientService } from "../services/features/patients/patient.service";
 import {
-  getAppointments,
-  getPatients,
-  createAppointment,
-  updateAppointment,
   sendNotification,
   connectGoogleCalendar,
   fetchGoogleCalendarEvents,
   exportToGoogleCalendar,
 } from "../services/supabaseService";
 import { Alert } from "../components/ui/Alert";
+import { useClickOutside } from "../src/hooks/useClickOutside";
+import { dateLocale, calendarMessages } from "../src/lib/i18n";
 
-// Setup moment locale
-moment.updateLocale("pt-br", {
-  weekdaysShort: ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"],
-});
-moment.locale("pt-br"); // Force set locale globally
+// moment locale setup removed
 
 const Agenda: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -133,28 +127,13 @@ const Agenda: React.FC = () => {
   }, [currentDate, appointments, filterStatus, filterPatient]);
 
   // Click outside to close date picker
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        datePickerRef.current &&
-        !datePickerRef.current.contains(event.target as Node)
-      ) {
-        setIsDatePickerOpen(false);
-      }
-    };
-    if (isDatePickerOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isDatePickerOpen]);
+  useClickOutside(datePickerRef, () => setIsDatePickerOpen(false), isDatePickerOpen);
 
   useEffect(() => {
     const fetchData = async () => {
       const [appData, patData] = await Promise.all([
-        getAppointments(),
-        getPatients(),
+        appointmentService.getAll(),
+        patientService.getAll(),
       ]);
       setAppointments(appData);
       setPatients(patData);
@@ -216,7 +195,7 @@ const Agenda: React.FC = () => {
         const updatedApp = appointments.find((a) => a.id === id);
         if (updatedApp) {
           const newItem = { ...updatedApp, status: "confirmed" as const };
-          await updateAppointment(newItem);
+          await appointmentService.update(newItem);
           setAppointments((prev) =>
             prev.map((app) => (app.id === id ? newItem : app)),
           );
@@ -267,7 +246,7 @@ const Agenda: React.FC = () => {
       return;
     }
 
-    setRescheduleTime(moment(start).format("HH:mm"));
+    setRescheduleTime(format(start, "HH:mm"));
     setDraggedEvent({ event, start, end });
   };
 
@@ -277,11 +256,9 @@ const Agenda: React.FC = () => {
     setIsRescheduling(true);
     const { event, start } = draggedEvent;
 
-    const newDateStr = moment(start).format("YYYY-MM-DD");
+    const newDateStr = format(start, "yyyy-MM-dd");
     const newTimeStr = rescheduleTime;
-    const formattedDateDisplay = moment(newDateStr + "T" + newTimeStr).format(
-      "DD/MM/YYYY [às] HH:mm",
-    );
+    const formattedDateDisplay = format(parseISO(newDateStr + "T" + newTimeStr), "dd/MM/yyyy 'às' HH:mm", { locale: dateLocale });
 
     try {
       const updatedAppointment = {
@@ -291,7 +268,7 @@ const Agenda: React.FC = () => {
         status: "scheduled" as const,
       };
 
-      await updateAppointment(updatedAppointment);
+      await appointmentService.update(updatedAppointment);
       await sendNotification("whatsapp", event.title, formattedDateDisplay);
 
       setAppointments((prev) =>
@@ -347,8 +324,8 @@ const Agenda: React.FC = () => {
         notes: newAppointment.notes,
       };
 
-      await createAppointment(app);
-      setAppointments((prev) => [...prev, app]);
+      const created = await appointmentService.create(app);
+      setAppointments((prev) => [...prev, created]);
 
       setNotificationStatus({
         type: "success",
@@ -397,11 +374,10 @@ const Agenda: React.FC = () => {
           <button
             onClick={handleConnectGoogle}
             disabled={isSyncing || isGoogleConnected}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all duration-300 ${
-              isGoogleConnected
-                ? "bg-verde-botanico/10 text-verde-botanico border-verde-botanico/20"
-                : "bg-white text-verde-botanico border-verde-botanico/20 hover:shadow-md"
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all duration-300 ${isGoogleConnected
+              ? "bg-verde-botanico/10 text-verde-botanico border-verde-botanico/20"
+              : "bg-white text-verde-botanico border-verde-botanico/20 hover:shadow-md"
+              }`}
           >
             {isSyncing ? (
               <Loader2 size={16} className="animate-spin" />
@@ -466,14 +442,14 @@ const Agenda: React.FC = () => {
                 className="flex items-center gap-2 px-3 py-1.5 text-sm font-bold text-verde-botanico bg-transparent hover:bg-bege-calmo transition-colors rounded-lg border border-verde-botanico/10"
               >
                 <CalendarIcon size={16} className="text-verde-botanico/60" />
-                {moment(currentDate).format("MMMM YYYY")}
+                {format(currentDate, "MMMM yyyy", { locale: dateLocale })}
               </button>
 
               {isDatePickerOpen && (
                 <div className="day-picker-popover">
                   <DayPicker
                     mode="single"
-                    locale={ptBR}
+                    locale={dateLocale}
                     selected={currentDate}
                     onSelect={(date) => {
                       if (date) {
@@ -491,7 +467,7 @@ const Agenda: React.FC = () => {
                     }}
                     formatters={{
                       formatWeekdayName: (date) =>
-                        format(date, "EEEEEE", { locale: ptBR }),
+                        format(date, "EEEEEE", { locale: dateLocale }),
                     }}
                   />
                 </div>
@@ -713,11 +689,10 @@ const Agenda: React.FC = () => {
             <div className="p-6 space-y-4">
               <div className="flex items-center gap-4">
                 <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl ${
-                    selectedEvent.resource.source === "google"
-                      ? "bg-blue-100 text-blue-600"
-                      : "bg-teal-50 text-teal-600"
-                  }`}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl ${selectedEvent.resource.source === "google"
+                    ? "bg-blue-100 text-blue-600"
+                    : "bg-teal-50 text-teal-600"
+                    }`}
                 >
                   {selectedEvent.title.charAt(0)}
                 </div>
@@ -727,9 +702,7 @@ const Agenda: React.FC = () => {
                   </h4>
                   <p className="text-verde-botanico text-sm flex items-center gap-1">
                     <Clock size={14} />
-                    {moment(selectedEvent.start).format(
-                      "DD/MM/YYYY [às] HH:mm",
-                    )}
+                    {format(selectedEvent.start, "dd/MM/yyyy 'às' HH:mm", { locale: dateLocale })}
                   </p>
                 </div>
               </div>
@@ -742,13 +715,12 @@ const Agenda: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <span
-                        className={`w-3 h-3 rounded-full ${
-                          selectedEvent.resource.status === "confirmed"
-                            ? "bg-green-500"
-                            : selectedEvent.resource.status === "cancelled"
-                              ? "bg-red-500"
-                              : "bg-teal-500"
-                        }`}
+                        className={`w-3 h-3 rounded-full ${selectedEvent.resource.status === "confirmed"
+                          ? "bg-green-500"
+                          : selectedEvent.resource.status === "cancelled"
+                            ? "bg-red-500"
+                            : "bg-teal-500"
+                          }`}
                       ></span>
                       <span className="text-verde-botanico font-medium capitalize">
                         {selectedEvent.resource.status === "confirmed"
@@ -828,7 +800,7 @@ const Agenda: React.FC = () => {
                     De
                   </p>
                   <p className="text-sm font-bold text-red-500 line-through decoration-2 decoration-red-200">
-                    {moment(draggedEvent.event.start).format("DD/MM HH:mm")}
+                    {format(draggedEvent.event.start, "dd/MM HH:mm")}
                   </p>
                 </div>
                 <ArrowRight className="text-verde-botanico w-5 h-5" />
@@ -838,7 +810,7 @@ const Agenda: React.FC = () => {
                   </p>
                   <div className="flex flex-col items-center">
                     <span className="text-sm font-bold text-teal-600 mb-1">
-                      {moment(draggedEvent.start).format("DD/MM")}
+                      {format(draggedEvent.start, "dd/MM")}
                     </span>
                     {/* Time Input for precise rescheduling */}
                     <input

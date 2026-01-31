@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
-import { ptBR } from "date-fns/locale";
-import moment from "moment";
+import { dateLocale } from "../src/lib/i18n";
+import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import {
   FileText,
   Download,
@@ -16,9 +16,12 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { appointmentService } from "../services/features/appointments/appointment.service";
+import { expenseService } from "../services/features/expenses/expense.service";
 import { generateReportPDF } from "../services/supabaseService";
 import { Alert } from "../components/ui/Alert";
 import { DatePickerInput } from "../src/components/ui/DatePickerInput";
+import { useClickOutside } from "../src/hooks/useClickOutside";
 
 const Reports: React.FC = () => {
   const [generatingReport, setGeneratingReport] = useState<string | null>(null);
@@ -30,20 +33,20 @@ const Reports: React.FC = () => {
   // State for dynamic date ranges - defaulting to current month
   const [reportRanges, setReportRanges] = useState({
     mensal: {
-      start: moment().startOf("month").format("YYYY-MM-DD"),
-      end: moment().endOf("month").format("YYYY-MM-DD"),
+      start: format(startOfMonth(new Date()), "yyyy-MM-dd"),
+      end: format(endOfMonth(new Date()), "yyyy-MM-dd"),
     },
     reembolso: {
-      start: moment().startOf("month").format("YYYY-MM-DD"),
-      end: moment().endOf("month").format("YYYY-MM-DD"),
+      start: format(startOfMonth(new Date()), "yyyy-MM-dd"),
+      end: format(endOfMonth(new Date()), "yyyy-MM-dd"),
     },
     financeiro: {
-      start: moment().startOf("month").format("YYYY-MM-DD"),
-      end: moment().endOf("month").format("YYYY-MM-DD"),
+      start: format(startOfMonth(new Date()), "yyyy-MM-dd"),
+      end: format(endOfMonth(new Date()), "yyyy-MM-dd"),
     },
     impostos: {
-      start: moment().startOf("month").format("YYYY-MM-DD"),
-      end: moment().endOf("month").format("YYYY-MM-DD"),
+      start: format(startOfMonth(new Date()), "yyyy-MM-dd"),
+      end: format(endOfMonth(new Date()), "yyyy-MM-dd"),
     },
   });
 
@@ -52,22 +55,7 @@ const Reports: React.FC = () => {
   const datePickerRef = useRef<HTMLDivElement>(null);
 
   // Click outside to close date picker
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        datePickerRef.current &&
-        !datePickerRef.current.contains(event.target as Node)
-      ) {
-        setActivePicker(null);
-      }
-    };
-    if (activePicker) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [activePicker]);
+  useClickOutside(datePickerRef, () => setActivePicker(null), activePicker !== null);
 
   const handleRangeChange = (
     reportId: string,
@@ -108,8 +96,8 @@ const Reports: React.FC = () => {
       return;
     }
 
-    const startDisplay = moment(range.start).format("DD/MM/YYYY");
-    const endDisplay = moment(range.end).format("DD/MM/YYYY");
+    const startDisplay = format(parseISO(range.start), "dd/MM/yyyy");
+    const endDisplay = format(parseISO(range.end), "dd/MM/yyyy");
 
     setGeneratingReport(type);
     setAlert({

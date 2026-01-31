@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { DayPicker } from "react-day-picker";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { dateLocale } from "../../lib/i18n";
 import "react-day-picker/dist/style.css";
 import "../../styles/daypicker.css";
 
@@ -84,34 +84,30 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
 
   const [currentMonth, setCurrentMonth] = useState<Date>(value || new Date());
 
-  // Sincronizar o mês exibido quando o valor externo muda (ex: reset de formulário)
-  useEffect(() => {
-    if (value) {
-      const targetMonth = new Date(value.getFullYear(), value.getMonth(), 1);
-      const currentMonthStart = new Date(
-        currentMonth.getFullYear(),
-        currentMonth.getMonth(),
-        1,
-      );
+  // Handler explícito para navegação de mês
+  const handleMonthChange = (newMonth: Date) => {
+    console.log("[DatePicker] Navegação detectada:", newMonth);
+    setCurrentMonth(newMonth);
+    updatePosition(); // Reposiciona popover
+  };
 
-      if (targetMonth.getTime() !== currentMonthStart.getTime()) {
-        console.log(
-          "[DatePickerInput] Sincronizando mês com valor selecionado",
-        );
-        setCurrentMonth(targetMonth);
-      }
+  // Sincronizar quando o valor selecionado mudar de mês/ano
+  useEffect(() => {
+    if (!value) {
+      setCurrentMonth(new Date());
+      return;
+    }
+
+    const isDifferentMonth =
+      value.getMonth() !== currentMonth.getMonth() ||
+      value.getFullYear() !== currentMonth.getFullYear();
+
+    if (isDifferentMonth) {
+      console.log("[DatePicker] Sincronizando mês com novo valor:", value);
+      setCurrentMonth(new Date(value.getFullYear(), value.getMonth(), 1));
     }
   }, [value]);
 
-  const handleMonthChange = (newMonth: Date) => {
-    console.log(
-      "[DatePickerInput] Navegação:",
-      format(newMonth, "MMMM yyyy", { locale: ptBR }),
-    );
-    setCurrentMonth(newMonth);
-    // Garantir que a posição do popover seja reavaliada se o tamanho mudar
-    setTimeout(updatePosition, 0);
-  };
 
   const handleSelect = (date: Date | undefined) => {
     onChange(date);
@@ -128,17 +124,17 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
         <input
           type="text"
           readOnly
-          value={value ? format(value, "dd/MM/yyyy", { locale: ptBR }) : ""}
+          value={value ? format(value, "dd/MM/yyyy", { locale: dateLocale }) : ""}
           onClick={toggleCalendar}
           placeholder={placeholder}
           disabled={disabled}
           className={`
-                        w-full px-4 py-2 border border-gray-300 rounded-lg 
-                        cursor-pointer focus:outline-none focus:ring-2 focus:ring-gray-500
-                        ${disabled ? "bg-gray-100 cursor-not-allowed" : "bg-white hover:border-gray-400"}
-                        transition-colors duration-200
-                        text-verde-botanico font-medium
-                    `}
+            w-full px-4 py-2 border border-gray-300 rounded-lg
+            cursor-pointer focus:outline-none focus:ring-2 focus:ring-gray-500
+            ${disabled ? "bg-gray-100 cursor-not-allowed" : "bg-white hover:border-gray-400"}
+            transition-colors duration-200
+            text-verde-botanico font-medium
+          `}
         />
 
         <svg
@@ -167,15 +163,15 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
             selected={value}
             onSelect={handleSelect}
             month={currentMonth}
-            onMonthChange={setCurrentMonth}
-            locale={ptBR}
+            onMonthChange={handleMonthChange}
+            locale={dateLocale}
             disabled={[
               ...(minDate ? [{ before: minDate }] : []),
               ...(maxDate ? [{ after: maxDate }] : []),
             ]}
             formatters={{
               formatWeekdayName: (date) =>
-                format(date, "ccccc", { locale: ptBR }),
+                format(date, "ccccc", { locale: dateLocale }),
             }}
           />
         </div>

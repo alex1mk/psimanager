@@ -21,10 +21,9 @@ import {
   Trash,
   AlertTriangle,
 } from "lucide-react";
-import moment from "moment";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
-import { ptBR } from "date-fns/locale";
+import { dateLocale } from "../src/lib/i18n";
 import { format, parse } from "date-fns";
 import { Expense, ExpenseType, Appointment } from "../types";
 import {
@@ -37,6 +36,7 @@ import {
 } from "../services/supabaseService";
 import { Alert } from "../components/ui/Alert";
 import { DatePickerInput } from "../src/components/ui/DatePickerInput";
+import { useClickOutside } from "../src/hooks/useClickOutside";
 
 const Expenses: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -79,22 +79,7 @@ const Expenses: React.FC = () => {
   const [ocrSessionTotal, setOcrSessionTotal] = useState<number>(0);
 
   // Click outside to close date picker
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        datePickerRef.current &&
-        !datePickerRef.current.contains(event.target as Node)
-      ) {
-        setIsDatePickerOpen(false);
-      }
-    };
-    if (isDatePickerOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isDatePickerOpen]);
+  useClickOutside(datePickerRef, () => setIsDatePickerOpen(false), isDatePickerOpen);
 
   // Load mock data initially
   useEffect(() => {

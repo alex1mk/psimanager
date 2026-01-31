@@ -1,10 +1,9 @@
 import { supabase } from '../src/lib/supabase'
-import { Patient, Appointment, Expense, PaymentType, ExpenseType } from '../types'
-import moment from 'moment'
-
-// ========================================
-// AUTHENTICATION HELPER
-// ========================================
+import { Patient, Appointment, Expense, ExpenseType } from '../types'
+import { patientService } from './features/patients/patient.service'
+import { appointmentService } from './features/appointments/appointment.service'
+import { expenseService } from './features/expenses/expense.service'
+import { format, parseISO } from 'date-fns'
 
 const ensureAuthenticated = async () => {
     const { data: { user }, error } = await supabase.auth.getUser()
@@ -42,228 +41,30 @@ export const onAuthStateChange = (callback: (user: any) => void) => {
     })
 }
 
-// ========================================
 // PATIENTS CRUD
-// ========================================
+// ----------------------------------------
 
-import { patientService } from './features/patients/patient.service'
+export const getPatients = () => patientService.getAll()
+export const createPatient = (p: Patient) => patientService.create(p)
+export const updatePatient = (p: Patient) => patientService.update(p)
+export const deletePatient = (id: string) => patientService.delete(id)
 
-export const getPatients = async (): Promise<Patient[]> => {
-    return patientService.getAll()
-}
-
-export const createPatient = async (patient: Patient): Promise<Patient> => {
-    return patientService.create(patient)
-}
-
-export const updatePatient = async (patient: Patient): Promise<Patient> => {
-    return patientService.update(patient)
-}
-
-export const deletePatient = async (id: string): Promise<void> => {
-    return patientService.delete(id)
-}
-
-// ========================================
 // APPOINTMENTS CRUD
-// ========================================
+// ----------------------------------------
 
-export const getAppointments = async (): Promise<Appointment[]> => {
-    await ensureAuthenticated()
-
-    const { data, error } = await supabase
-        .from('appointments')
-        .select(`
-      *,
-      patients (name)
-    `)
-        .order('scheduled_date', { ascending: true })
-
-    if (error) throw error
-
-    return data.map(a => ({
-        id: a.id,
-        patientId: a.patient_id,
-        patientName: a.patients?.name || 'Paciente não encontrado',
-        date: a.scheduled_date,
-        time: a.scheduled_time,
-        status: a.status as 'scheduled' | 'confirmed' | 'completed' | 'cancelled',
-        notes: a.notes,
-        source: a.source as 'internal' | 'google',
-        googleId: a.google_id
-    }))
-}
-
-export const createAppointment = async (appointment: Appointment): Promise<Appointment> => {
-    await ensureAuthenticated()
-
-    const { data, error } = await supabase
-        .from('appointments')
-        .insert({
-            patient_id: appointment.patientId,
-            scheduled_date: appointment.date,
-            scheduled_time: appointment.time,
-            status: appointment.status,
-            notes: appointment.notes,
-            source: appointment.source || 'internal',
-            google_id: appointment.googleId
-        })
-        .select(`
-      *,
-      patients (name)
-    `)
-        .single()
-
-    if (error) throw error
-
-    return {
-        id: data.id,
-        patientId: data.patient_id,
-        patientName: data.patients?.name || appointment.patientName,
-        date: data.scheduled_date,
-        time: data.scheduled_time,
-        status: data.status,
-        notes: data.notes,
-        source: data.source,
-        googleId: data.google_id
-    }
-}
-
-export const updateAppointment = async (appointment: Appointment): Promise<Appointment> => {
-    await ensureAuthenticated()
-
-    const { data, error } = await supabase
-        .from('appointments')
-        .update({
-            patient_id: appointment.patientId,
-            scheduled_date: appointment.date,
-            scheduled_time: appointment.time,
-            status: appointment.status,
-            notes: appointment.notes,
-            source: appointment.source,
-            google_id: appointment.googleId
-        })
-        .eq('id', appointment.id)
-        .select(`
-      *,
-      patients (name)
-    `)
-        .single()
-
-    if (error) throw error
-
-    return {
-        id: data.id,
-        patientId: data.patient_id,
-        patientName: data.patients?.name || appointment.patientName,
-        date: data.scheduled_date,
-        time: data.scheduled_time,
-        status: data.status,
-        notes: data.notes,
-        source: data.source,
-        googleId: data.google_id
-    }
-}
+export const getAppointments = () => appointmentService.getAll()
+export const createAppointment = (a: Appointment) => appointmentService.create(a)
+export const updateAppointment = (a: Appointment) => appointmentService.update(a)
+// Note: deleteAppointment was not previously exported/implemented in supabaseService.ts
 
 // ========================================
 // EXPENSES CRUD
 // ========================================
 
-export const getExpenses = async (): Promise<Expense[]> => {
-    await ensureAuthenticated()
-
-    const { data, error } = await supabase
-        .from('expenses')
-        .select('*')
-        .order('date', { ascending: false })
-
-    if (error) throw error
-
-    return data.map(e => ({
-        id: e.id,
-        description: e.description,
-        amount: Number(e.amount),
-        date: e.date,
-        category: e.category,
-        type: e.type as ExpenseType,
-        receiptUrl: e.receipt_url,
-        merchantName: e.merchant_name
-    }))
-}
-
-export const createExpense = async (expense: Expense): Promise<Expense> => {
-    await ensureAuthenticated()
-
-    const { data, error } = await supabase
-        .from('expenses')
-        .insert({
-            description: expense.description,
-            merchant_name: expense.merchantName,
-            amount: expense.amount,
-            date: expense.date,
-            category: expense.category,
-            type: expense.type === ExpenseType.PF ? 'PF' : 'PJ',
-            receipt_url: expense.receiptUrl
-        })
-        .select()
-        .single()
-
-    if (error) throw error
-
-    return {
-        id: data.id,
-        description: data.description,
-        amount: Number(data.amount),
-        date: data.date,
-        category: data.category,
-        type: data.type as ExpenseType,
-        receiptUrl: data.receipt_url,
-        merchantName: data.merchant_name
-    }
-}
-
-export const updateExpense = async (expense: Expense): Promise<Expense> => {
-    await ensureAuthenticated()
-
-    const { data, error } = await supabase
-        .from('expenses')
-        .update({
-            description: expense.description,
-            merchant_name: expense.merchantName,
-            amount: expense.amount,
-            date: expense.date,
-            category: expense.category,
-            type: expense.type === ExpenseType.PF ? 'PF' : 'PJ',
-            receipt_url: expense.receiptUrl
-        })
-        .eq('id', expense.id)
-        .select()
-        .single()
-
-    if (error) throw error
-
-    return {
-        id: data.id,
-        description: data.description,
-        amount: Number(data.amount),
-        date: data.date,
-        category: data.category,
-        type: data.type as ExpenseType,
-        receiptUrl: data.receipt_url,
-        merchantName: data.merchant_name
-    }
-}
-
-export const deleteExpense = async (id: string): Promise<void> => {
-    await ensureAuthenticated()
-
-    const { error } = await supabase
-        .from('expenses')
-        .delete()
-        .eq('id', id)
-
-    if (error) throw error
-}
+export const getExpenses = () => expenseService.getAll()
+export const createExpense = (e: Expense) => expenseService.create(e)
+export const updateExpense = (e: Expense) => expenseService.update(e)
+export const deleteExpense = (id: string) => expenseService.delete(id)
 
 // ========================================
 // UTILITY FUNCTIONS
@@ -389,7 +190,7 @@ export const generateReportPDF = async (month: string, data?: { patients: Patien
                 yPos = 20
             }
             const statusMap: any = { 'scheduled': 'Agendado', 'confirmed': 'Confirmado', 'completed': 'Realizado', 'cancelled': 'Cancelado' }
-            doc.text(`${moment(app.date).format('DD/MM')} - ${app.patientName} (${statusMap[app.status] || app.status})`, 20, yPos)
+            doc.text(`${format(parseISO(app.date), 'dd/MM')} - ${app.patientName} (${statusMap[app.status] || app.status})`, 20, yPos)
             yPos += 7
         })
     }
@@ -417,7 +218,7 @@ export const generateReportPDF = async (month: string, data?: { patients: Patien
                 doc.addPage()
                 yPos = 20
             }
-            doc.text(`${moment(exp.date).format('DD/MM')} - ${exp.description} (R$ ${exp.amount.toFixed(2)})`, 20, yPos)
+            doc.text(`${format(parseISO(exp.date), 'dd/MM')} - ${exp.description} (R$ ${exp.amount.toFixed(2)})`, 20, yPos)
             yPos += 7
         })
     }

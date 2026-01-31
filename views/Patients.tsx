@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import moment from "moment";
 import {
   Plus,
   Search,
@@ -28,6 +27,7 @@ import {
 import { patientService } from "../services/features/patients/patient.service";
 import { Alert } from "../components/ui/Alert";
 import { DatePickerInput } from "../src/components/ui/DatePickerInput";
+import { useClickOutside } from "../src/hooks/useClickOutside";
 import ExcelJS from "exceljs";
 import { supabase } from "../src/lib/supabase";
 
@@ -54,7 +54,7 @@ function sanitizePatientData(excelRow: any) {
   if (!mappedPaymentType) {
     throw new Error(
       `Tipo de pagamento inválido: "${rawPaymentType}". ` +
-        `Valores aceitos: Sessão, Quinzenal, Mensal`,
+      `Valores aceitos: Sessão, Quinzenal, Mensal`,
     );
   }
 
@@ -93,22 +93,7 @@ const Patients: React.FC = () => {
   const datePickerRef = useRef<HTMLDivElement>(null);
 
   // Click outside to close date picker
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        datePickerRef.current &&
-        !datePickerRef.current.contains(event.target as Node)
-      ) {
-        setIsDatePickerOpen(false);
-      }
-    };
-    if (isDatePickerOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isDatePickerOpen]);
+  useClickOutside(datePickerRef, () => setIsDatePickerOpen(false), isDatePickerOpen);
 
   const [currentPatient, setCurrentPatient] = useState<Partial<Patient>>({
     name: "",
@@ -701,7 +686,16 @@ const Patients: React.FC = () => {
                       <input
                         type="tel"
                         value={currentPatient.phone}
-                        onChange={(e) => handleChange("phone", e.target.value)}
+                        onChange={(e) => {
+                          let val = e.target.value.replace(/\D/g, "");
+                          if (val.length > 11) val = val.slice(0, 11);
+                          let formatted = val;
+                          if (val.length > 2)
+                            formatted = `(${val.slice(0, 2)}) ${val.slice(2)}`;
+                          if (val.length > 7)
+                            formatted = `(${val.slice(0, 2)}) ${val.slice(2, 7)}-${val.slice(7)}`;
+                          handleChange("phone", formatted);
+                        }}
                         className="bg-white pl-10 w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-verde-botanico"
                         placeholder="(00) 00000-0000"
                       />

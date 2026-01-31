@@ -1,7 +1,6 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, memo, useMemo } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
-import { ptBR } from "date-fns/locale";
 import {
   Users,
   DollarSign,
@@ -23,14 +22,17 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { getAppointments, getExpenses } from "../services/supabaseService";
+import { appointmentService } from "../services/features/appointments/appointment.service";
+import { expenseService } from "../services/features/expenses/expense.service";
 import { patientService } from "../services/features/patients/patient.service";
 import { Appointment, Patient, Expense } from "../types";
-import moment from "moment";
-import "moment/locale/pt-br";
+import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
+import { dateLocale } from "../src/lib/i18n";
+import { useClickOutside } from "../src/hooks/useClickOutside";
+import { supabase } from "../src/lib/supabase";
 
 // Ensure locale is set
-moment.locale("pt-br");
+// moment.locale("pt-br") removed as date-fns uses locale objects per function call
 
 // Suppress Recharts defaultProps warnings (known issue in functional components + React 18)
 const error = console.error;
@@ -39,24 +41,31 @@ console.error = (...args: any) => {
   error(...args);
 };
 
-const StatCard: React.FC<{
+const StatCard = memo(({ title, value, icon: Icon, color, subtext }: {
   title: string;
   value: string;
   icon: React.ElementType;
   color: string;
   subtext: string;
-}> = ({ title, value, icon: Icon, color, subtext }) => (
-  <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex items-start justify-between hover:shadow-md transition-shadow">
-    <div>
-      <p className="text-sm font-medium text-verde-botanico mb-1">{title}</p>
-      <h3 className="text-2xl font-bold text-verde-botanico">{value}</h3>
-      <p className="text-xs text-verde-botanico mt-2">{subtext}</p>
+}) => {
+  console.log('[StatCard] Renderizando:', title);
+  return (
+    <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex items-start justify-between hover:shadow-md transition-shadow">
+      <div>
+        <p className="text-sm font-medium text-verde-botanico mb-1">{title}</p>
+        <h3 className="text-2xl font-bold text-verde-botanico">{value}</h3>
+        <p className="text-xs text-verde-botanico mt-2">{subtext}</p>
+      </div>
+      <div className={`p-3 rounded-lg ${color}`}>
+        <Icon className="w-6 h-6 text-white" />
+      </div>
     </div>
-    <div className={`p-3 rounded-lg ${color}`}>
-      <Icon className="w-6 h-6 text-white" />
-    </div>
-  </div>
-);
+  );
+}, (prevProps, nextProps) => {
+  return prevProps.value === nextProps.value;
+});
+
+StatCard.displayName = 'StatCard';
 
 interface DashboardProps {
   onNavigate: (view: string) => void;
@@ -67,10 +76,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [showAlert, setShowAlert] = useState(false);
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(
-    moment().startOf("month").format("YYYY-MM-DD"),
+    format(startOfMonth(new Date()), "yyyy-MM-dd")
   );
   const [endDate, setEndDate] = useState(
-    moment().endOf("month").format("YYYY-MM-DD"),
+    format(endOfMonth(new Date()), "yyyy-MM-dd")
   );
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -83,7 +92,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [monthlyRevenue, setMonthlyRevenue] = useState(0);
   const [scheduledSessionsCount, setScheduledSessionsCount] = useState(0);
   const [pendingIssuesCount, setPendingIssuesCount] = useState(0);
-  const [chartData, setChartData] = useState<any[]>([]);
 
   const [viewDate, setViewDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -93,110 +101,34 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const datePickerRef = useRef<HTMLDivElement>(null);
 
   // Click outside to close date picker
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        datePickerRef.current &&
-        !datePickerRef.current.contains(event.target as Node)
-      ) {
-        setActivePicker(null);
-      }
-    };
-    if (activePicker) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [activePicker]);
+  useClickOutside(
+    datePickerRef,
+    () => setActivePicker(null),
+    activePicker !== null,
+  );
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [apps, pats, exps] = await Promise.all([
-          getAppointments(),
-          patientService.getAll(),
-          getExpenses(),
+        setLoading(true);
+        const [rpcRes, apps] = await Promise.all([
+          supabase.rpc('get_dashboard_summary', {
+            p_start_date: startDate,
+            p_end_date: endDate
+          }),
+          appointmentService.getAll()
         ]);
 
+        if (rpcRes.error) throw rpcRes.error;
+        const data = rpcRes.data;
+
         setAppointments(apps);
-        setPatients(pats);
-        setExpenses(exps);
+        setActivePatientsCount(data.total_patients);
+        setMonthlyRevenue(data.total_revenue);
+        setScheduledSessionsCount(data.total_appointments);
+        setPendingIssuesCount(data.total_expenses); // Adjusted to show total expenses as per audit
+        setChartData(data.monthly_data || []);
 
-        // --- Calculate Stats ---
-
-        // 1. Active Patients
-        const activeCount = pats.filter((p) => p.status === "active").length;
-        setActivePatientsCount(activeCount);
-        // New patients this month (Assuming we had a createdAt field, but we don't. using 0 or placeholder logic)
-        // Since we don't have createdAt, we'll just show 0 for now or remove the diff text
-        setNewPatientsMonth(0);
-
-        // 2. Revenue (Faturamento) & Chart Data
-        // Since we don't have explicit income tracking yet, we will calculate based on...
-        // Actually, for now, we only have Expenses. "Receitas" will be 0 until implemented.
-        // We will aggregate expenses by month for the chart.
-        const currentYear = new Date().getFullYear();
-        const monthlyStats = Array.from({ length: 6 }, (_, i) => {
-          const d = new Date();
-          d.setMonth(d.getMonth() - (5 - i));
-          return {
-            monthIdx: d.getMonth(), // 0-11
-            year: d.getFullYear(),
-            name: d
-              .toLocaleDateString("pt-BR", { month: "short" })
-              .replace(".", ""),
-            receitas: 0,
-            despesas: 0,
-          };
-        });
-
-        exps.forEach((e) => {
-          const eDate = new Date(e.date);
-          const mIdx = eDate.getMonth();
-          const y = eDate.getFullYear();
-
-          // Find in monthlyStats
-          const stat = monthlyStats.find(
-            (s) => s.monthIdx === mIdx && s.year === y,
-          );
-          if (stat) {
-            stat.despesas += e.amount;
-          }
-        });
-
-        setChartData(monthlyStats);
-
-        // Current Month Revenue (Placeholder)
-        setMonthlyRevenue(0);
-
-        // 3. Scheduled Sessions (Next 7 days)
-        const now = new Date();
-        const next7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-        const nextSessions = apps.filter((a) => {
-          const d = new Date(a.date);
-          return d >= now && d <= next7Days && a.status === "scheduled";
-        }).length;
-        setScheduledSessionsCount(nextSessions);
-
-        // 4. Pending Issues (e.g. Expenses without receipts?)
-        // Let's say pending issues are expenses without receiptUrl (if that's a requirement) or just static 0
-        const pending = exps.filter((e) => !e.receiptUrl).length; // Example logic
-        setPendingIssuesCount(pending);
-
-        // --- Alert Logic (Next 24h) ---
-        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        const urgentCount = apps.filter((app) => {
-          const appDate = new Date(`${app.date}T${app.time}`);
-          return (
-            appDate >= now && appDate <= tomorrow && app.status === "scheduled"
-          );
-        }).length;
-
-        if (urgentCount > 0) {
-          setUpcomingCount(urgentCount);
-          setShowAlert(true);
-        }
       } catch (error) {
         console.error("Failed to fetch dashboard data", error);
       } finally {
@@ -205,14 +137,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     };
 
     fetchData();
-  }, []);
+  }, [startDate, endDate]);
+
+  const [chartData, setChartData] = useState<any[]>([]);
 
   // Filter appointments for the selected day (viewDate)
   const dailyAppointments = appointments
     .filter((app) => {
       // Compare YYYY-MM-DD strings
       return (
-        app.date === moment(viewDate).format("YYYY-MM-DD") &&
+        app.date === format(viewDate, "yyyy-MM-dd") &&
         app.status !== "cancelled"
       );
     })
@@ -295,14 +229,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 }
                 className="bg-transparent text-sm font-medium text-verde-botanico outline-none hover:bg-verde-botanico/5 px-2 py-1 rounded-lg transition-colors"
               >
-                {moment(startDate).format("DD/MM/YYYY")}
+                {format(parseISO(startDate), "dd/MM/yyyy")}
               </button>
 
               {activePicker === "start" && (
                 <div className="absolute top-full left-0 mt-2 z-[9999] bg-white border border-verde-botanico/20 shadow-2xl rounded-2xl p-4 animate-fade-in inline-block">
                   <DayPicker
                     mode="single"
-                    locale={ptBR}
+                    locale={dateLocale}
                     selected={new Date(startDate + "T12:00:00")}
                     month={currentMonth}
                     onMonthChange={setCurrentMonth}
@@ -340,14 +274,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 }
                 className="bg-transparent text-sm font-medium text-verde-botanico outline-none hover:bg-verde-botanico/5 px-2 py-1 rounded-lg transition-colors"
               >
-                {moment(endDate).format("DD/MM/YYYY")}
+                {format(parseISO(endDate), "dd/MM/yyyy")}
               </button>
 
               {activePicker === "end" && (
                 <div className="absolute top-full right-0 mt-2 z-[9999] bg-white border border-verde-botanico/20 shadow-2xl rounded-2xl p-4 animate-fade-in inline-block">
                   <DayPicker
                     mode="single"
-                    locale={ptBR}
+                    locale={dateLocale}
                     selected={new Date(endDate + "T12:00:00")}
                     month={currentMonth}
                     onMonthChange={setCurrentMonth}
@@ -410,11 +344,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           subtext="Próximos 7 dias"
         />
         <StatCard
-          title="Pendências Fiscais"
-          value={pendingIssuesCount.toString()}
+          title="Total Despesas"
+          value={`R$ ${pendingIssuesCount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
           icon={AlertTriangle}
           color="bg-verde-botanico/40"
-          subtext="Despesas sem comprovante"
+          subtext="No período selecionado"
         />
       </div>
 
@@ -429,69 +363,91 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             </select>
           </div>
           <div className="h-80 w-full relative">
-            {chartData.every((d) => d.receitas === 0 && d.despesas === 0) ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-verde-botanico/40 border-2 border-dashed border-verde-botanico/10 rounded-xl bg-gray-50/50">
-                <BarChart3 size={48} className="mb-2 opacity-50" />
-                <p className="font-medium text-sm">
-                  Nenhum dado financeiro registrado
-                </p>
-                <p className="text-xs">
-                  As receitas e despesas aparecerão aqui.
-                </p>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={chartData}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="#e2e8f0"
-                  />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "#64748b", fontSize: 12 }}
-                    dy={10}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "#64748b", fontSize: 12 }}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "#F7F5F0" }}
-                    contentStyle={{
-                      borderRadius: "16px",
-                      border: "1px solid #5B6D5B/10",
-                      boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
-                      backgroundColor: "rgba(255, 255, 255, 0.9)",
-                    }}
-                    formatter={(value: number) => [
-                      `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-                      "",
-                    ]}
-                  />
-                  <Bar
-                    dataKey="receitas"
-                    fill="#5B6D5B"
-                    radius={[6, 6, 0, 0]}
-                    name="Receitas"
-                    barSize={32}
-                  />
-                  <Bar
-                    dataKey="despesas"
-                    fill="#8C7A6B"
-                    radius={[6, 6, 0, 0]}
-                    name="Despesas"
-                    barSize={32}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
+            {(() => {
+              const hasData =
+                chartData.length > 0 &&
+                chartData.some((d) => d.receitas > 0 || d.despesas > 0);
+
+              if (!hasData) {
+                return (
+                  <div className="flex flex-col items-center justify-center h-[300px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                    <svg
+                      className="w-16 h-16 text-gray-400 mb-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                      />
+                    </svg>
+                    <p className="text-gray-600 font-medium">
+                      Nenhum dado disponível
+                    </p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Adicione receitas ou despesas para visualizar o gráfico
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart
+                    data={chartData}
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#e2e8f0"
+                    />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "#64748b", fontSize: 12 }}
+                      dy={10}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "#64748b", fontSize: 12 }}
+                    />
+                    <Tooltip
+                      cursor={{ fill: "#F7F5F0" }}
+                      contentStyle={{
+                        borderRadius: "16px",
+                        border: "1px solid #5B6D5B/10",
+                        boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+                        backgroundColor: "rgba(255, 255, 255, 0.9)",
+                      }}
+                      formatter={(value: number) => [
+                        `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+                        "",
+                      ]}
+                    />
+                    <Bar
+                      dataKey="receitas"
+                      fill="#5B6D5B"
+                      radius={[6, 6, 0, 0]}
+                      name="Receitas"
+                      barSize={32}
+                    />
+                    <Bar
+                      dataKey="despesas"
+                      fill="#8C7A6B"
+                      radius={[6, 6, 0, 0]}
+                      name="Despesas"
+                      barSize={32}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              );
+            })()}
           </div>
         </div>
 

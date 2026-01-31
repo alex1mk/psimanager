@@ -39,10 +39,19 @@ serve(async (req) => {
 
     const { id, name, email, phone } = payload.record;
 
-    // 1. Generate Confirmation Link
+    // 1. Generate Secure Confirmation Link with HMAC Token
+    const secret = Deno.env.get("CONFIRMATION_SECRET") || "your-secret-key-here";
+    const token = await crypto.subtle
+      .digest("SHA-256", new TextEncoder().encode(`${id}:${secret}`))
+      .then((buffer) =>
+        Array.from(new Uint8Array(buffer))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join(""),
+      );
+
     const projectUrl =
       Deno.env.get("SUPABASE_URL") ?? "https://[YOUR_PROJECT_REF].supabase.co";
-    const confirmLink = `${projectUrl}/functions/v1/confirm-scheduling?patient_id=${id}`;
+    const confirmLink = `${projectUrl}/functions/v1/confirm-scheduling?patient_id=${id}&token=${token}`;
 
     // 2. Determine Recipients (Test Mode Support)
     const adminEmail = Deno.env.get("ADMIN_EMAIL");
@@ -77,17 +86,23 @@ serve(async (req) => {
       `,
     });
 
-    // 4. Send WhatsApp (Twilio)
-    const twilioSender =
-      Deno.env.get("TWILIO_PHONE_NUMBER") || "whatsapp:+14155238886";
-    const formattedToPhone = toPhone.startsWith("whatsapp:")
-      ? toPhone
-      : `whatsapp:${toPhone}`;
+    // 4. Send WhatsApp Notification
+    const twilioSender = Deno.env.get("TWILIO_WHATSAPP_NUMBER") || "whatsapp:+14155238886";
+
+    // Normalize phone (Brazil +55)
+    let cleanPhone = toPhone.replace(/\D/g, "");
+    if (cleanPhone.length === 11 || cleanPhone.length === 10) {
+      cleanPhone = "55" + cleanPhone;
+    } else if (!cleanPhone.startsWith("55") && cleanPhone.length > 0) {
+      cleanPhone = "55" + cleanPhone;
+    }
+    const formattedToPhone = `whatsapp:+${cleanPhone}`;
 
     const results: any = { email: null, whatsapp: null };
 
-    // Send sequentially to avoid rate limits or sync issues
     console.log(`[Function] Sending Email to ${toEmail}`);
+    console.log(`[Link] Generated: ${confirmLink}`);
+
     try {
       results.email = await emailPromise;
       console.log("Email sent successfully");
@@ -99,11 +114,11 @@ serve(async (req) => {
     console.log(`[Function] Sending WhatsApp to ${formattedToPhone}`);
     try {
       results.whatsapp = await twilioClient.messages.create({
-        body: `Olá ${name}! Bem-vindo(a) ao Psimanager. \n\nPor favor, confirme seu agendamento clicando aqui: ${confirmLink}`,
+        body: `Olá ${name}! Bem-vindo(a) ao Psimanager. 📝\n\nPor favor, confirme seu agendamento clicando aqui:\n${confirmLink}`,
         from: twilioSender,
         to: formattedToPhone,
       });
-      console.log("WhatsApp sent successfully");
+      console.log("WhatsApp sent successfully SID:", results.whatsapp.sid);
     } catch (e) {
       console.error("WhatsApp failed:", e);
       results.whatsapp = { status: "rejected", reason: e.message };

@@ -3,10 +3,6 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import "./src/styles/daypicker.css";
-import moment from "moment";
-import "moment/locale/pt-br";
-
-moment.locale("pt-br");
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
