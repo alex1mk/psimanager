@@ -1,31 +1,62 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { UploadCloud, FileText, Check, Loader2, DollarSign, Building, User, Plus, X, Calendar, Tag, Store, Save, FileCheck, Search, Mail, MessageCircle, Edit2, Trash, AlertTriangle } from 'lucide-react';
-import moment from 'moment';
-import { DayPicker } from 'react-day-picker';
-import 'react-day-picker/dist/style.css';
-import { ptBR } from 'date-fns/locale';
-import { format, parse } from 'date-fns';
-import { Expense, ExpenseType, Appointment } from '../types';
-import { analyzeReceiptOCR, getExpenses, createExpense, updateExpense, deleteExpense, getAppointments } from '../services/supabaseService';
-import { Alert } from '../components/ui/Alert';
-import { DatePickerInput } from '../src/components/ui/DatePickerInput';
+import React, { useState, useEffect, useRef } from "react";
+import {
+  UploadCloud,
+  FileText,
+  Check,
+  Loader2,
+  DollarSign,
+  Building,
+  User,
+  Plus,
+  X,
+  Calendar,
+  Tag,
+  Store,
+  Save,
+  FileCheck,
+  Search,
+  Mail,
+  MessageCircle,
+  Edit2,
+  Trash,
+  AlertTriangle,
+} from "lucide-react";
+import moment from "moment";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/dist/style.css";
+import { ptBR } from "date-fns/locale";
+import { format, parse } from "date-fns";
+import { Expense, ExpenseType, Appointment } from "../types";
+import {
+  analyzeReceiptOCR,
+  getExpenses,
+  createExpense,
+  updateExpense,
+  deleteExpense,
+  getAppointments,
+} from "../services/supabaseService";
+import { Alert } from "../components/ui/Alert";
+import { DatePickerInput } from "../src/components/ui/DatePickerInput";
 
 const Expenses: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [alert, setAlert] = useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'PF' | 'PJ'>('ALL');
+  const [alert, setAlert] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const [activeTab, setActiveTab] = useState<"ALL" | "PF" | "PJ">("ALL");
 
   // Manual Entry / Edit State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentExpense, setCurrentExpense] = useState<Partial<Expense>>({
-    description: '',
-    merchantName: '',
+    description: "",
+    merchantName: "",
     amount: 0,
-    date: new Date().toISOString().split('T')[0],
-    category: 'Geral',
-    type: ExpenseType.PJ
+    date: new Date().toISOString().split("T")[0],
+    category: "Geral",
+    type: ExpenseType.PJ,
   });
 
   // Delete State
@@ -34,11 +65,15 @@ const Expenses: React.FC = () => {
 
   // Receipt Generation State
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
-  const [confirmableAppointments, setConfirmableAppointments] = useState<Appointment[]>([]);
+  const [confirmableAppointments, setConfirmableAppointments] = useState<
+    Appointment[]
+  >([]);
   const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
-  const [expenseMonth, setExpenseMonth] = useState<Date>(currentExpense.date ? new Date(currentExpense.date) : new Date());
+  const [expenseMonth, setExpenseMonth] = useState<Date>(
+    currentExpense.date ? new Date(currentExpense.date) : new Date(),
+  );
 
   // OCR session total for automatic sum
   const [ocrSessionTotal, setOcrSessionTotal] = useState<number>(0);
@@ -46,15 +81,18 @@ const Expenses: React.FC = () => {
   // Click outside to close date picker
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+      if (
+        datePickerRef.current &&
+        !datePickerRef.current.contains(event.target as Node)
+      ) {
         setIsDatePickerOpen(false);
       }
     };
     if (isDatePickerOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isDatePickerOpen]);
 
@@ -65,17 +103,20 @@ const Expenses: React.FC = () => {
 
   const handleOpenReceiptModal = async () => {
     const allApps = await getAppointments();
-    const confirmed = allApps.filter(app => app.status === 'confirmed');
+    const confirmed = allApps.filter((app) => app.status === "confirmed");
     setConfirmableAppointments(confirmed);
     setIsReceiptModalOpen(true);
   };
 
-  const generateReceipt = async (app: Appointment, method: 'email' | 'whatsapp') => {
+  const generateReceipt = async (
+    app: Appointment,
+    method: "email" | "whatsapp",
+  ) => {
     setIsGeneratingReceipt(true);
     setTimeout(() => {
       setAlert({
-        type: 'success',
-        message: `Recibo gerado para ${app.patientName} e enviado via ${method === 'email' ? 'E-mail' : 'WhatsApp'}!`
+        type: "success",
+        message: `Recibo gerado para ${app.patientName} e enviado via ${method === "email" ? "E-mail" : "WhatsApp"}!`,
       });
       setIsGeneratingReceipt(false);
       setIsReceiptModalOpen(false);
@@ -94,38 +135,40 @@ const Expenses: React.FC = () => {
 
       const expense: Expense = {
         id: Math.random().toString(36).substr(2, 9),
-        description: extractedData.description || 'Despesa sem descrição',
+        description: extractedData.description || "Despesa sem descrição",
         amount: extractedData.amount || 0,
-        date: extractedData.date || new Date().toISOString().split('T')[0],
-        category: extractedData.category || 'Geral',
+        date: extractedData.date || new Date().toISOString().split("T")[0],
+        category: extractedData.category || "Geral",
         type: extractedData.type || ExpenseType.PJ,
         merchantName: extractedData.merchantName,
-        receiptUrl: '#' // Mock
+        receiptUrl: "#", // Mock
       };
 
       try {
         await createExpense(expense);
-        setExpenses(prev => [expense, ...prev]);
+        setExpenses((prev) => [expense, ...prev]);
 
         // Update OCR session total
         const newTotal = ocrSessionTotal + expense.amount;
         setOcrSessionTotal(newTotal);
 
         setAlert({
-          type: 'success',
-          message: `Recibo analisado e salvo! Valor: R$ ${expense.amount.toFixed(2)} | Total da sessão OCR: R$ ${newTotal.toFixed(2)}`
+          type: "success",
+          message: `Recibo analisado e salvo! Valor: R$ ${expense.amount.toFixed(2)} | Total da sessão OCR: R$ ${newTotal.toFixed(2)}`,
         });
       } catch (dbError: any) {
         console.error("DB Error Saving Expense:", dbError);
-        setAlert({ type: 'error', message: `Erro ao salvar no banco: ${dbError.message || 'Erro desconhecido'}` });
+        setAlert({
+          type: "error",
+          message: `Erro ao salvar no banco: ${dbError.message || "Erro desconhecido"}`,
+        });
       }
-
     } catch (error) {
       console.error("OCR Analysis Error:", error);
-      setAlert({ type: 'error', message: 'Falha na análise do recibo (OCR).' });
+      setAlert({ type: "error", message: "Falha na análise do recibo (OCR)." });
     } finally {
       setIsUploading(false);
-      e.target.value = '';
+      e.target.value = "";
     }
   };
 
@@ -133,12 +176,12 @@ const Expenses: React.FC = () => {
   const handleOpenNew = () => {
     setIsEditing(false);
     setCurrentExpense({
-      description: '',
-      merchantName: '',
+      description: "",
+      merchantName: "",
       amount: 0,
-      date: new Date().toISOString().split('T')[0],
-      category: 'Geral',
-      type: ExpenseType.PJ
+      date: new Date().toISOString().split("T")[0],
+      category: "Geral",
+      type: ExpenseType.PJ,
     });
     setIsModalOpen(true);
   };
@@ -153,7 +196,7 @@ const Expenses: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentExpense.description || !currentExpense.amount) {
-      setAlert({ type: 'error', message: 'Preencha a descrição e o valor.' });
+      setAlert({ type: "error", message: "Preencha a descrição e o valor." });
       return;
     }
 
@@ -161,28 +204,36 @@ const Expenses: React.FC = () => {
       if (isEditing && currentExpense.id) {
         // Update
         const updated = await updateExpense(currentExpense as Expense);
-        setExpenses(prev => prev.map(e => e.id === updated.id ? updated : e));
-        setAlert({ type: 'success', message: 'Despesa atualizada com sucesso!' });
+        setExpenses((prev) =>
+          prev.map((e) => (e.id === updated.id ? updated : e)),
+        );
+        setAlert({
+          type: "success",
+          message: "Despesa atualizada com sucesso!",
+        });
       } else {
         // Create
         const expense: Expense = {
           id: Math.random().toString(36).substr(2, 9),
-          description: currentExpense.description || '',
+          description: currentExpense.description || "",
           amount: Number(currentExpense.amount),
-          date: currentExpense.date || new Date().toISOString().split('T')[0],
-          category: currentExpense.category || 'Geral',
+          date: currentExpense.date || new Date().toISOString().split("T")[0],
+          category: currentExpense.category || "Geral",
           type: currentExpense.type || ExpenseType.PJ,
           merchantName: currentExpense.merchantName,
-          receiptUrl: undefined
+          receiptUrl: undefined,
         };
         await createExpense(expense);
-        setExpenses(prev => [expense, ...prev]);
-        setAlert({ type: 'success', message: 'Despesa adicionada manualmente!' });
+        setExpenses((prev) => [expense, ...prev]);
+        setAlert({
+          type: "success",
+          message: "Despesa adicionada manualmente!",
+        });
       }
 
       setIsModalOpen(false);
     } catch (error) {
-      setAlert({ type: 'error', message: 'Erro ao salvar despesa.' });
+      setAlert({ type: "error", message: "Erro ao salvar despesa." });
     }
   };
 
@@ -195,10 +246,10 @@ const Expenses: React.FC = () => {
     setIsDeleting(true);
     try {
       await deleteExpense(expenseToDelete);
-      setExpenses(prev => prev.filter(e => e.id !== expenseToDelete));
-      setAlert({ type: 'success', message: 'Despesa excluída com sucesso.' });
+      setExpenses((prev) => prev.filter((e) => e.id !== expenseToDelete));
+      setAlert({ type: "success", message: "Despesa excluída com sucesso." });
     } catch (error) {
-      setAlert({ type: 'error', message: 'Erro ao excluir despesa.' });
+      setAlert({ type: "error", message: "Erro ao excluir despesa." });
     } finally {
       setIsDeleting(false);
       setExpenseToDelete(null);
@@ -206,12 +257,12 @@ const Expenses: React.FC = () => {
   };
 
   const handleInputChange = (field: keyof Expense, value: any) => {
-    setCurrentExpense(prev => ({ ...prev, [field]: value }));
+    setCurrentExpense((prev) => ({ ...prev, [field]: value }));
   };
 
-  const filteredExpenses = expenses.filter(exp => {
-    if (activeTab === 'ALL') return true;
-    if (activeTab === 'PF') return exp.type === ExpenseType.PF;
+  const filteredExpenses = expenses.filter((exp) => {
+    if (activeTab === "ALL") return true;
+    if (activeTab === "PF") return exp.type === ExpenseType.PF;
     return exp.type === ExpenseType.PJ;
   });
 
@@ -219,8 +270,12 @@ const Expenses: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-verde-botanico">Despesas & Recibos</h2>
-          <p className="text-verde-botanico">Gestão financeira com OCR automático.</p>
+          <h2 className="text-2xl font-bold text-verde-botanico">
+            Despesas & Recibos
+          </h2>
+          <p className="text-verde-botanico">
+            Gestão financeira com OCR automático.
+          </p>
         </div>
         <div className="flex gap-2">
           <button
@@ -260,10 +315,13 @@ const Expenses: React.FC = () => {
           </div>
           <div>
             <h3 className="text-lg font-semibold text-verde-botanico">
-              {isUploading ? 'Processando imagem (OCR)...' : 'Upload de Recibo / Nota Fiscal'}
+              {isUploading
+                ? "Processando imagem (OCR)..."
+                : "Upload de Recibo / Nota Fiscal"}
             </h3>
             <p className="text-verde-botanico text-sm mt-1 max-w-md mx-auto">
-              Arraste seu arquivo ou clique para selecionar. O sistema extrairá automaticamente valores, datas e descrições via Google Vision.
+              Arraste seu arquivo ou clique para selecionar. O sistema extrairá
+              automaticamente valores, datas e descrições via Google Vision.
             </p>
           </div>
           <div className="relative mt-2">
@@ -289,20 +347,20 @@ const Expenses: React.FC = () => {
         <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
             <button
-              onClick={() => setActiveTab('ALL')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'ALL' ? 'bg-white text-verde-botanico shadow-sm' : 'text-verde-botanico hover:text-verde-botanico'}`}
+              onClick={() => setActiveTab("ALL")}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "ALL" ? "bg-white text-verde-botanico shadow-sm" : "text-verde-botanico hover:text-verde-botanico"}`}
             >
               Todas
             </button>
             <button
-              onClick={() => setActiveTab('PF')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'PF' ? 'bg-white text-verde-botanico shadow-sm' : 'text-verde-botanico hover:text-verde-botanico'}`}
+              onClick={() => setActiveTab("PF")}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "PF" ? "bg-white text-verde-botanico shadow-sm" : "text-verde-botanico hover:text-verde-botanico"}`}
             >
               Pessoa Física (CPF)
             </button>
             <button
-              onClick={() => setActiveTab('PJ')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'PJ' ? 'bg-white text-verde-botanico shadow-sm' : 'text-verde-botanico hover:text-verde-botanico'}`}
+              onClick={() => setActiveTab("PJ")}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "PJ" ? "bg-white text-verde-botanico shadow-sm" : "text-verde-botanico hover:text-verde-botanico"}`}
             >
               Pessoa Jurídica (CNPJ)
             </button>
@@ -323,21 +381,36 @@ const Expenses: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredExpenses.map((expense) => (
-                <tr key={expense.id} className="hover:bg-gray-50 transition-colors">
+                <tr
+                  key={expense.id}
+                  className="hover:bg-gray-50 transition-colors"
+                >
                   <td className="px-6 py-4">
-                    <div className="font-medium text-verde-botanico">{expense.description}</div>
-                    <div className="text-xs text-verde-botanico">{expense.merchantName || 'Não informado'}</div>
+                    <div className="font-medium text-verde-botanico">
+                      {expense.description}
+                    </div>
+                    <div className="text-xs text-verde-botanico">
+                      {expense.merchantName || "Não informado"}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <span className="bg-slate-100 text-verde-botanico px-2 py-1 rounded text-xs border border-slate-200">
                       {expense.category}
                     </span>
                   </td>
-                  <td className="px-6 py-4">{new Date(expense.date).toLocaleDateString('pt-BR')}</td>
+                  <td className="px-6 py-4">
+                    {new Date(expense.date).toLocaleDateString("pt-BR")}
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1.5">
-                      {expense.type === ExpenseType.PJ ? <Building size={14} className="text-verde-botanico" /> : <User size={14} className="text-verde-botanico" />}
-                      <span>{expense.type === ExpenseType.PJ ? 'PJ' : 'PF'}</span>
+                      {expense.type === ExpenseType.PJ ? (
+                        <Building size={14} className="text-verde-botanico" />
+                      ) : (
+                        <User size={14} className="text-verde-botanico" />
+                      )}
+                      <span>
+                        {expense.type === ExpenseType.PJ ? "PJ" : "PF"}
+                      </span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right font-semibold text-verde-botanico">
@@ -345,8 +418,11 @@ const Expenses: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-center gap-2">
-                      {expense.receiptUrl && expense.receiptUrl !== '#' && (
-                        <button className="p-1.5 text-verde-botanico hover:text-teal-600 hover:bg-teal-50 rounded transition-colors" title="Ver Recibo">
+                      {expense.receiptUrl && expense.receiptUrl !== "#" && (
+                        <button
+                          className="p-1.5 text-verde-botanico hover:text-teal-600 hover:bg-teal-50 rounded transition-colors"
+                          title="Ver Recibo"
+                        >
                           <FileText size={16} />
                         </button>
                       )}
@@ -386,7 +462,7 @@ const Expenses: React.FC = () => {
             <div className="bg-bege-calmo/50 p-4 border-b border-verde-botanico/10 flex justify-between items-center rounded-t-xl">
               <h3 className="font-bold text-verde-botanico text-lg flex items-center gap-2 font-sans">
                 {isEditing ? <Edit2 size={20} /> : <Plus size={20} />}
-                {isEditing ? 'Editar Despesa' : 'Nova Despesa Manual'}
+                {isEditing ? "Editar Despesa" : "Nova Despesa Manual"}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -401,7 +477,9 @@ const Expenses: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Descrição */}
                   <div className="col-span-2">
-                    <label className="block text-sm font-medium text-verde-botanico mb-1">Descrição do Item</label>
+                    <label className="block text-sm font-medium text-verde-botanico mb-1">
+                      Descrição do Item
+                    </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <Tag className="h-5 w-5 text-verde-botanico" />
@@ -410,7 +488,9 @@ const Expenses: React.FC = () => {
                         type="text"
                         required
                         value={currentExpense.description}
-                        onChange={(e) => handleInputChange('description', e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("description", e.target.value)
+                        }
                         className="bg-white pl-10 w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-verde-botanico"
                         placeholder="Ex: Aluguel, Compra de material, Livros..."
                       />
@@ -419,7 +499,9 @@ const Expenses: React.FC = () => {
 
                   {/* Estabelecimento */}
                   <div>
-                    <label className="block text-sm font-medium text-verde-botanico mb-1">Estabelecimento (Opcional)</label>
+                    <label className="block text-sm font-medium text-verde-botanico mb-1">
+                      Estabelecimento (Opcional)
+                    </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <Store className="h-5 w-5 text-verde-botanico" />
@@ -427,7 +509,9 @@ const Expenses: React.FC = () => {
                       <input
                         type="text"
                         value={currentExpense.merchantName}
-                        onChange={(e) => handleInputChange('merchantName', e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("merchantName", e.target.value)
+                        }
                         className="bg-white pl-10 w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-verde-botanico"
                         placeholder="Ex: Livraria Saraiva"
                       />
@@ -436,7 +520,9 @@ const Expenses: React.FC = () => {
 
                   {/* Valor */}
                   <div>
-                    <label className="block text-sm font-medium text-verde-botanico mb-1">Valor (R$)</label>
+                    <label className="block text-sm font-medium text-verde-botanico mb-1">
+                      Valor (R$)
+                    </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <DollarSign className="h-5 w-5 text-verde-botanico" />
@@ -447,7 +533,9 @@ const Expenses: React.FC = () => {
                         step="0.01"
                         min="0"
                         value={currentExpense.amount}
-                        onChange={(e) => handleInputChange('amount', e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("amount", e.target.value)
+                        }
                         className="bg-white pl-10 w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 p-2.5 border text-verde-botanico"
                         placeholder="0.00"
                       />
@@ -456,20 +544,35 @@ const Expenses: React.FC = () => {
 
                   {/* Data */}
                   <div>
-                    <label className="block text-sm font-medium text-verde-botanico mb-1">Data</label>
+                    <label className="block text-sm font-medium text-verde-botanico mb-1">
+                      Data
+                    </label>
                     <DatePickerInput
-                      value={currentExpense.date ? new Date(currentExpense.date + 'T12:00:00') : undefined}
-                      onChange={(date) => handleInputChange('date', date ? date.toISOString().split('T')[0] : '')}
+                      value={
+                        currentExpense.date
+                          ? new Date(currentExpense.date + "T12:00:00")
+                          : undefined
+                      }
+                      onChange={(date) =>
+                        handleInputChange(
+                          "date",
+                          date ? date.toISOString().split("T")[0] : "",
+                        )
+                      }
                       placeholder="28/01/2026"
                     />
                   </div>
 
                   {/* Categoria */}
                   <div>
-                    <label className="block text-sm font-medium text-verde-botanico mb-1">Categoria</label>
+                    <label className="block text-sm font-medium text-verde-botanico mb-1">
+                      Categoria
+                    </label>
                     <select
                       value={currentExpense.category}
-                      onChange={(e) => handleInputChange('category', e.target.value)}
+                      onChange={(e) =>
+                        handleInputChange("category", e.target.value)
+                      }
                       className="bg-white w-full border-gray-300 rounded-lg shadow-sm focus:ring-verde-botanico focus:border-verde-botanico p-2.5 border text-verde-botanico"
                     >
                       <option>Geral</option>
@@ -485,7 +588,9 @@ const Expenses: React.FC = () => {
 
                   {/* Tipo (PF/PJ) */}
                   <div className="col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                    <label className="block text-sm font-medium text-verde-botanico mb-2">Tipo de Despesa (Contabilidade)</label>
+                    <label className="block text-sm font-medium text-verde-botanico mb-2">
+                      Tipo de Despesa (Contabilidade)
+                    </label>
                     <div className="flex gap-4">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -493,7 +598,9 @@ const Expenses: React.FC = () => {
                           name="expenseType"
                           className="text-teal-600 focus:ring-teal-500 h-4 w-4"
                           checked={currentExpense.type === ExpenseType.PJ}
-                          onChange={() => handleInputChange('type', ExpenseType.PJ)}
+                          onChange={() =>
+                            handleInputChange("type", ExpenseType.PJ)
+                          }
                         />
                         <span className="text-sm text-verde-botanico flex items-center gap-1">
                           <Building size={16} className="text-purple-500" />
@@ -507,7 +614,9 @@ const Expenses: React.FC = () => {
                           name="expenseType"
                           className="text-teal-600 focus:ring-teal-500 h-4 w-4"
                           checked={currentExpense.type === ExpenseType.PF}
-                          onChange={() => handleInputChange('type', ExpenseType.PF)}
+                          onChange={() =>
+                            handleInputChange("type", ExpenseType.PF)
+                          }
                         />
                         <span className="text-sm text-verde-botanico flex items-center gap-1">
                           <User size={16} className="text-teal-500" />
@@ -531,7 +640,7 @@ const Expenses: React.FC = () => {
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-verde-botanico text-white rounded-xl hover:bg-verde-botanico/90 font-bold text-sm shadow-md transition-all font-sans"
                   >
                     <Save size={18} />
-                    {isEditing ? 'Atualizar Despesa' : 'Salvar Despesa'}
+                    {isEditing ? "Atualizar Despesa" : "Salvar Despesa"}
                   </button>
                 </div>
               </form>
@@ -550,9 +659,12 @@ const Expenses: React.FC = () => {
                   <AlertTriangle className="text-red-600 w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-verde-botanico">Confirmar Exclusão</h3>
+                  <h3 className="text-lg font-bold text-verde-botanico">
+                    Confirmar Exclusão
+                  </h3>
                   <p className="text-verde-botanico text-sm mt-1">
-                    Tem certeza que deseja excluir esta despesa? Esta ação não pode ser desfeita.
+                    Tem certeza que deseja excluir esta despesa? Esta ação não
+                    pode ser desfeita.
                   </p>
                 </div>
               </div>
@@ -575,7 +687,9 @@ const Expenses: React.FC = () => {
                       <Loader2 className="animate-spin w-4 h-4" />
                       Excluindo...
                     </>
-                  ) : 'Confirmar Exclusão'}
+                  ) : (
+                    "Confirmar Exclusão"
+                  )}
                 </button>
               </div>
             </div>
@@ -602,7 +716,10 @@ const Expenses: React.FC = () => {
 
             <div className="p-6">
               <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-verde-botanico" size={16} />
+                <Search
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-verde-botanico"
+                  size={16}
+                />
                 <input
                   type="text"
                   placeholder="Buscar agendamento confirmado..."
@@ -616,17 +733,23 @@ const Expenses: React.FC = () => {
                     Nenhum agendamento confirmado disponível para emissão.
                   </p>
                 ) : (
-                  confirmableAppointments.map(app => (
-                    <div key={app.id} className="p-3 border border-gray-200 rounded-lg hover:bg-slate-50 flex justify-between items-center group">
+                  confirmableAppointments.map((app) => (
+                    <div
+                      key={app.id}
+                      className="p-3 border border-gray-200 rounded-lg hover:bg-slate-50 flex justify-between items-center group"
+                    >
                       <div>
-                        <p className="font-medium text-verde-botanico text-sm">{app.patientName}</p>
+                        <p className="font-medium text-verde-botanico text-sm">
+                          {app.patientName}
+                        </p>
                         <p className="text-xs text-verde-botanico">
-                          {new Date(app.date).toLocaleDateString('pt-BR')} às {app.time}
+                          {new Date(app.date).toLocaleDateString("pt-BR")} às{" "}
+                          {app.time}
                         </p>
                       </div>
                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={() => generateReceipt(app, 'email')}
+                          onClick={() => generateReceipt(app, "email")}
                           disabled={isGeneratingReceipt}
                           className="p-1.5 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
                           title="Gerar e enviar por E-mail"
@@ -634,7 +757,7 @@ const Expenses: React.FC = () => {
                           <Mail size={16} />
                         </button>
                         <button
-                          onClick={() => generateReceipt(app, 'whatsapp')}
+                          onClick={() => generateReceipt(app, "whatsapp")}
                           disabled={isGeneratingReceipt}
                           className="p-1.5 bg-green-100 text-green-600 rounded hover:bg-green-200"
                           title="Gerar e enviar por WhatsApp"
@@ -648,7 +771,10 @@ const Expenses: React.FC = () => {
               </div>
 
               <div className="bg-yellow-50 p-3 rounded text-xs text-yellow-800 border border-yellow-200">
-                <p>💡 Ao gerar o recibo, o sistema criará automaticamente um registro financeiro de "Entrada".</p>
+                <p>
+                  💡 Ao gerar o recibo, o sistema criará automaticamente um
+                  registro financeiro de "Entrada".
+                </p>
               </div>
             </div>
           </div>

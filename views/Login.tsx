@@ -1,22 +1,29 @@
-import React, { useState } from 'react';
-import { Lock, Mail, ArrowRight, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
-import { signIn } from '../services/supabaseService';
+import React, { useState } from "react";
+import {
+  Lock,
+  Mail,
+  ArrowRight,
+  Loader2,
+  CheckCircle,
+  AlertTriangle,
+} from "lucide-react";
+import { signIn } from "../services/supabaseService";
 
 interface LoginProps {
   onLogin: (user: { name: string; email: string }) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const [email, setEmail] = useState('carmem@clareser.com.br');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("carmem@clareser.com.br");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccessMessage('');
+    setError("");
+    setSuccessMessage("");
     setIsLoading(true);
 
     try {
@@ -24,20 +31,20 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       if (user) {
         onLogin({
-          name: user.user_metadata?.name || email.split('@')[0],
-          email: user.email || email
+          name: user.user_metadata?.name || email.split("@")[0],
+          email: user.email || email,
         });
       }
     } catch (err: any) {
-      console.error('Login error:', err);
+      console.error("Login error:", err);
 
       // Translate common Supabase errors to Portuguese
-      if (err.message?.includes('Invalid login credentials')) {
-        setError('E-mail ou senha incorretos. Tente novamente.');
-      } else if (err.message?.includes('Email not confirmed')) {
-        setError('E-mail não confirmado. Verifique sua caixa de entrada.');
+      if (err.message?.includes("Invalid login credentials")) {
+        setError("E-mail ou senha incorretos. Tente novamente.");
+      } else if (err.message?.includes("Email not confirmed")) {
+        setError("E-mail não confirmado. Verifique sua caixa de entrada.");
       } else {
-        setError(err.message || 'Erro ao fazer login. Tente novamente.');
+        setError(err.message || "Erro ao fazer login. Tente novamente.");
       }
     } finally {
       setIsLoading(false);
@@ -46,16 +53,18 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   const handleForgotPassword = (e: React.MouseEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccessMessage('');
+    setError("");
+    setSuccessMessage("");
 
     if (!email) {
-      setError('Por favor, digite seu e-mail para recuperar a senha.');
+      setError("Por favor, digite seu e-mail para recuperar a senha.");
       return;
     }
 
     // TODO: Implement password recovery with Supabase
-    setSuccessMessage(`Enviamos as instruções de recuperação para ${email}. Verifique sua caixa de entrada.`);
+    setSuccessMessage(
+      `Enviamos as instruções de recuperação para ${email}. Verifique sua caixa de entrada.`,
+    );
   };
 
   return (
@@ -89,7 +98,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <div className="bg-white py-8 px-4 shadow-xl shadow-slate-200/50 sm:rounded-2xl sm:px-10 border border-gray-100">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-verde-botanico">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-verde-botanico"
+              >
                 E-mail Profissional
               </label>
               <div className="mt-1 relative rounded-md shadow-sm">
@@ -111,7 +123,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-verde-botanico">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-verde-botanico"
+              >
                 Senha
               </label>
               <div className="mt-1 relative rounded-md shadow-sm">
@@ -136,10 +151,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               <div className="rounded-md bg-red-50 p-4 animate-fade-in border border-red-100">
                 <div className="flex">
                   <div className="flex-shrink-0">
-                    <AlertTriangle className="h-5 w-5 text-red-400" aria-hidden="true" />
+                    <AlertTriangle
+                      className="h-5 w-5 text-red-400"
+                      aria-hidden="true"
+                    />
                   </div>
                   <div className="ml-3">
-                    <h3 className="text-sm font-medium text-red-800">{error}</h3>
+                    <h3 className="text-sm font-medium text-red-800">
+                      {error}
+                    </h3>
                   </div>
                 </div>
               </div>
@@ -152,7 +172,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     <CheckCircle className="h-5 w-5 text-green-400" />
                   </div>
                   <div className="ml-3">
-                    <h3 className="text-sm font-medium text-green-800">{successMessage}</h3>
+                    <h3 className="text-sm font-medium text-green-800">
+                      {successMessage}
+                    </h3>
                   </div>
                 </div>
               </div>
@@ -166,7 +188,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   type="checkbox"
                   className="h-4 w-4 text-[#5B6D5B] focus:ring-[#5B6D5B] border-gray-300 rounded bg-white shadow-none accent-[#5B6D5B]"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-verde-botanico">
+                <label
+                  htmlFor="remember-me"
+                  className="ml-2 block text-sm text-verde-botanico"
+                >
                   Lembrar-me
                 </label>
               </div>

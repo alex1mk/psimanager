@@ -168,22 +168,34 @@
     width: 100% !important;
     display: flex !important;
     justify-content: space-between !important;
-    top: 0 !important;
-    pointer-events: none !important;
+    top: 5px !important;
+    /* Ajustado para alinhar com o texto do mês */
+    z-index: 10 !important;
 }
 
-.rdp-button_next,
-.rdp-button_previous {
+.rdp-nav_button,
+.rdp-nav_button_next,
+.rdp-nav_button_previous {
     pointer-events: auto !important;
     width: 28px !important;
     height: 28px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    background: transparent !important;
-    border: none !important;
+    background: white !important;
+    /* Fundo branco para garantir visibilidade */
+    border: 1px solid #e5e7eb !important;
+    border-radius: 6px !important;
     color: #4b5563 !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
 }
+
+.rdp-nav_button:hover {
+    background-color: #f3f4f6 !important;
+    border-color: #d1d5db !important;
+}
+
 
 @keyframes fadeInUp {
     from {

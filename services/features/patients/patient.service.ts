@@ -22,10 +22,17 @@ export class PatientService extends BaseService {
     async create(patient: Patient): Promise<Patient> {
         await this.ensureAuthenticated()
 
-        // Map PaymentType to DB Constraint values
-        let dbPaymentType = 'Por Sessão';
-        if (patient.paymentType === PaymentType.MONTHLY) dbPaymentType = 'Mensal';
-        if (patient.paymentType === PaymentType.BIWEEKLY) dbPaymentType = 'Quinzenal';
+        const dbPaymentType = this.normalizePaymentType(patient.paymentType);
+
+        // Validação
+        if (!['Sessão', 'Quinzenal', 'Mensal'].includes(dbPaymentType)) {
+            throw new Error(`Tipo de pagamento inválido: ${patient.paymentType}`);
+        }
+
+        console.log('[Patient Create]', {
+            original: patient.paymentType,
+            normalized: dbPaymentType
+        });
 
         const { data, error } = await this.supabase
             .from(this.tableName)
@@ -41,18 +48,34 @@ export class PatientService extends BaseService {
             .select()
             .single()
 
-        if (error) this.handleError(error)
+        if (error) {
+            console.error('[Patient Create Error]', {
+                code: error.code,
+                message: error.message,
+                patient: patient.name,
+                paymentType: dbPaymentType
+            });
+            this.handleError(error);
+        }
 
         return this.mapToEntity(data)
     }
 
+
     async update(patient: Patient): Promise<Patient> {
         await this.ensureAuthenticated()
 
-        // Map PaymentType to DB Constraint values
-        let dbPaymentType = 'Por Sessão';
-        if (patient.paymentType === PaymentType.MONTHLY) dbPaymentType = 'Mensal';
-        if (patient.paymentType === PaymentType.BIWEEKLY) dbPaymentType = 'Quinzenal';
+        const dbPaymentType = this.normalizePaymentType(patient.paymentType);
+
+        // Validação
+        if (!['Sessão', 'Quinzenal', 'Mensal'].includes(dbPaymentType)) {
+            throw new Error(`Tipo de pagamento inválido: ${patient.paymentType}`);
+        }
+
+        console.log('[Patient Update]', {
+            original: patient.paymentType,
+            normalized: dbPaymentType
+        });
 
         const { data, error } = await this.supabase
             .from(this.tableName)
@@ -69,10 +92,19 @@ export class PatientService extends BaseService {
             .select()
             .single()
 
-        if (error) this.handleError(error)
+        if (error) {
+            console.error('[Patient Update Error]', {
+                code: error.code,
+                message: error.message,
+                patient: patient.name,
+                paymentType: dbPaymentType
+            });
+            this.handleError(error);
+        }
 
         return this.mapToEntity(data)
     }
+
 
     async delete(id: string): Promise<void> {
         await this.ensureAuthenticated()
@@ -83,6 +115,25 @@ export class PatientService extends BaseService {
             .eq('id', id)
 
         if (error) this.handleError(error)
+    }
+
+    private normalizePaymentType(input: string | undefined): string {
+        if (!input) return 'Sessão';
+
+        const normalized = input.trim().toLowerCase();
+
+        const mapping: Record<string, string> = {
+            'sessao': 'Sessão',
+            'sessão': 'Sessão',
+            'por sessao': 'Sessão',
+            'por sessão': 'Sessão',
+            'quinzenal': 'Quinzenal',
+            'mensal': 'Mensal',
+            'mes': 'Mensal',
+            'mês': 'Mensal'
+        };
+
+        return mapping[normalized] || 'Sessão';
     }
 
     private mapToEntity(p: any): Patient {

@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import Sidebar from './components/Sidebar';
-import Dashboard from './views/Dashboard';
-import Agenda from './views/Agenda';
-import Expenses from './views/Expenses';
-import Reports from './views/Reports';
-import Patients from './views/Patients';
-import Login from './views/Login';
-import { Menu, Coffee } from 'lucide-react';
+import React, { useState } from "react";
+import Sidebar from "./components/Sidebar";
+import Dashboard from "./views/Dashboard";
+import Agenda from "./views/Agenda";
+import Expenses from "./views/Expenses";
+import Reports from "./views/Reports";
+import Patients from "./views/Patients";
+import Login from "./views/Login";
+import { Menu, Coffee } from "lucide-react";
 
 interface User {
   name: string;
@@ -14,7 +14,7 @@ interface User {
 }
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState('dashboard');
+  const [currentView, setCurrentView] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -30,17 +30,23 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setUser(null);
     setIsAuthenticated(false);
-    setCurrentView('dashboard');
+    setCurrentView("dashboard");
   };
 
   const renderView = () => {
     switch (currentView) {
-      case 'dashboard': return <Dashboard onNavigate={setCurrentView} />;
-      case 'agenda': return <Agenda />;
-      case 'expenses': return <Expenses />;
-      case 'reports': return <Reports />;
-      case 'patients': return <Patients />;
-      default: return <Dashboard onNavigate={setCurrentView} />;
+      case "dashboard":
+        return <Dashboard onNavigate={setCurrentView} />;
+      case "agenda":
+        return <Agenda />;
+      case "expenses":
+        return <Expenses />;
+      case "reports":
+        return <Reports />;
+      case "patients":
+        return <Patients />;
+      default:
+        return <Dashboard onNavigate={setCurrentView} />;
     }
   };
 
@@ -50,7 +56,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-bege-calmo flex font-sans text-verde-botanico relative overflow-hidden">
-
       {/* Watermark */}
       <div className="absolute inset-0 z-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
         <Coffee size={500} strokeWidth={1} />
@@ -75,14 +80,60 @@ const App: React.FC = () => {
 
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-30 bg-slate-900/50" onClick={() => setMobileMenuOpen(false)}>
-          <div className="bg-verde-botanico w-64 h-full pt-16 flex flex-col justify-between" onClick={e => e.stopPropagation()}>
+        <div
+          className="md:hidden fixed inset-0 z-30 bg-slate-900/50"
+          onClick={() => setMobileMenuOpen(false)}
+        >
+          <div
+            className="bg-verde-botanico w-64 h-full pt-16 flex flex-col justify-between"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex flex-col p-4 space-y-2">
-              <button onClick={() => { setCurrentView('dashboard'); setMobileMenuOpen(false); }} className="p-3 text-left hover:bg-white/10 rounded text-white font-medium">Dashboard</button>
-              <button onClick={() => { setCurrentView('agenda'); setMobileMenuOpen(false); }} className="p-3 text-left hover:bg-white/10 rounded text-white font-medium">Agenda</button>
-              <button onClick={() => { setCurrentView('patients'); setMobileMenuOpen(false); }} className="p-3 text-left hover:bg-white/10 rounded text-white font-medium">Pacientes</button>
-              <button onClick={() => { setCurrentView('expenses'); setMobileMenuOpen(false); }} className="p-3 text-left hover:bg-white/10 rounded text-white font-medium">Despesas</button>
-              <button onClick={() => { setCurrentView('reports'); setMobileMenuOpen(false); }} className="p-3 text-left hover:bg-white/10 rounded text-white font-medium">Relatórios</button>
+              <button
+                onClick={() => {
+                  setCurrentView("dashboard");
+                  setMobileMenuOpen(false);
+                }}
+                className="p-3 text-left hover:bg-white/10 rounded text-white font-medium"
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => {
+                  setCurrentView("agenda");
+                  setMobileMenuOpen(false);
+                }}
+                className="p-3 text-left hover:bg-white/10 rounded text-white font-medium"
+              >
+                Agenda
+              </button>
+              <button
+                onClick={() => {
+                  setCurrentView("patients");
+                  setMobileMenuOpen(false);
+                }}
+                className="p-3 text-left hover:bg-white/10 rounded text-white font-medium"
+              >
+                Pacientes
+              </button>
+              <button
+                onClick={() => {
+                  setCurrentView("expenses");
+                  setMobileMenuOpen(false);
+                }}
+                className="p-3 text-left hover:bg-white/10 rounded text-white font-medium"
+              >
+                Despesas
+              </button>
+              <button
+                onClick={() => {
+                  setCurrentView("reports");
+                  setMobileMenuOpen(false);
+                }}
+                className="p-3 text-left hover:bg-white/10 rounded text-white font-medium"
+              >
+                Relatórios
+              </button>
             </div>
             <div className="p-4 border-t border-white/10 text-white">
               <div className="mb-4 px-3">
@@ -101,8 +152,9 @@ const App: React.FC = () => {
       )}
 
       <main
-        className={`flex-1 p-6 md:p-10 pt-20 md:pt-10 transition-all duration-300 ease-in-out relative z-10 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'
-          }`}
+        className={`flex-1 p-6 md:p-10 pt-20 md:pt-10 transition-all duration-300 ease-in-out relative z-10 ${
+          isSidebarCollapsed ? "md:ml-20" : "md:ml-64"
+        }`}
       >
         {renderView()}
       </main>
