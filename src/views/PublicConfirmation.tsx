@@ -61,7 +61,13 @@ export default function PublicConfirmation() {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error || 'Erro ao carregar dados');
+                if (response.status === 410) {
+                    throw new Error('Link de confirmação expirado ou já utilizado. Por favor, entre em contato com o consultório para solicitar um novo.');
+                }
+                if (response.status === 404) {
+                    throw new Error('Agendamento não encontrado. Verifique se o link está correto.');
+                }
+                throw new Error(data.error || 'Erro ao carregar dados do agendamento.');
             }
 
             setAppointmentData(data.appointment);
@@ -76,6 +82,7 @@ export default function PublicConfirmation() {
 
             setLoading(false);
         } catch (err) {
+            console.error(err);
             setError(err instanceof Error ? err.message : 'Erro desconhecido');
             setLoading(false);
         }
