@@ -39,13 +39,13 @@ import {
 } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
-import { DatePickerInput } from "../src/components/ui/DatePickerInput";
-import "../src/styles/agenda.css";
+import { DatePickerInput } from "../components/ui/DatePickerInput";
+import "../styles/agenda.css";
 import { Appointment, Patient } from "../types";
 import { appointmentService } from "../services/features/appointments/appointment.service";
 import { patientService } from "../services/features/patients/patient.service";
-import PreScheduleModal from "../src/components/appointments/PreScheduleModal";
-import { useAppointmentSync } from "../src/hooks/useAppointmentSync";
+import PreScheduleModal from "../components/appointments/PreScheduleModal";
+import { useAppointmentSync } from "../hooks/useAppointmentSync";
 import { GoogleCalendarService } from "../services/integrations/google-calendar.service";
 import {
   sendNotification,
@@ -54,8 +54,8 @@ import {
   exportToGoogleCalendar,
 } from "../services/supabaseService";
 import { Alert } from "../components/ui/Alert";
-import { useClickOutside } from "../src/hooks/useClickOutside";
-import { dateLocale, calendarMessages } from "../src/lib/i18n";
+import { useClickOutside } from "../hooks/useClickOutside";
+import { dateLocale, calendarMessages } from "../lib/i18n";
 
 // moment locale setup removed
 
@@ -554,7 +554,7 @@ const Agenda: React.FC = () => {
       <div className="calendar-main-container">
         {/* Imagem de fundo da xícara */}
         <img
-          src="/assets/coffee-cup.svg"
+          src="/src/assets/coffee-cup.svg"
           alt=""
           className="calendar-coffee-bg"
         />

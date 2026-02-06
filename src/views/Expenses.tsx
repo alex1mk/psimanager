@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
-import { dateLocale } from "../src/lib/i18n";
+import { dateLocale } from "../lib/i18n";
 import { format, parse } from "date-fns";
 import { Expense, ExpenseType, Appointment } from "../types";
 import {
@@ -35,8 +35,8 @@ import {
   getAppointments,
 } from "../services/supabaseService";
 import { Alert } from "../components/ui/Alert";
-import { DatePickerInput } from "../src/components/ui/DatePickerInput";
-import { useClickOutside } from "../src/hooks/useClickOutside";
+import { DatePickerInput } from "../components/ui/DatePickerInput";
+import { useClickOutside } from "../hooks/useClickOutside";
 
 const Expenses: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);

@@ -27,12 +27,12 @@ import {
 } from "../services/supabaseService";
 import { patientService } from "../services/features/patients/patient.service";
 import { Alert } from "../components/ui/Alert";
-import { DatePickerInput } from "../src/components/ui/DatePickerInput";
-import { useClickOutside } from "../src/hooks/useClickOutside";
+import { DatePickerInput } from "../components/ui/DatePickerInput";
+import { useClickOutside } from "../hooks/useClickOutside";
 import ExcelJS from "exceljs";
-import { supabase } from "../src/lib/supabase";
+import { supabase } from "../lib/supabase";
 import { AppointmentEngine } from "../services/features/appointments/appointment-engine.service";
-import PreScheduleModal from "../src/components/appointments/PreScheduleModal";
+import PreScheduleModal from "../components/appointments/PreScheduleModal";
 
 // Mapeamento de valores Excel → Banco (PT-BR)
 const PAYMENT_TYPE_MAP: Record<string, string> = {

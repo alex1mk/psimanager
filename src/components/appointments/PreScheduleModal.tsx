@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar, Clock, User, Copy, Mail, CheckCircle, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { AppointmentEngine } from '../../../services/features/appointments/appointment-engine.service';
+import { AppointmentEngine } from '../../services/features/appointments/appointment-engine.service';
 
 interface Patient {
     id: string;

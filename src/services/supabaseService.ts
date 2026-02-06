@@ -1,4 +1,4 @@
-import { supabase } from '../src/lib/supabase'
+import { supabase } from '../lib/supabase'
 import { Patient, Appointment, Expense, ExpenseType } from '../types'
 import { patientService } from './features/patients/patient.service'
 import { appointmentService } from './features/appointments/appointment.service'

@@ -27,9 +27,9 @@ import { expenseService } from "../services/features/expenses/expense.service";
 import { patientService } from "../services/features/patients/patient.service";
 import { Appointment, Patient, Expense } from "../types";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
-import { dateLocale } from "../src/lib/i18n";
-import { useClickOutside } from "../src/hooks/useClickOutside";
-import { supabase } from "../src/lib/supabase";
+import { dateLocale } from "../lib/i18n";
+import { useClickOutside } from "../hooks/useClickOutside";
+import { supabase } from "../lib/supabase";
 
 // Ensure locale is set
 // moment.locale("pt-br") removed as date-fns uses locale objects per function call

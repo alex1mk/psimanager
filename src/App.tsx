@@ -6,7 +6,7 @@ import Expenses from "./views/Expenses";
 import Reports from "./views/Reports";
 import Patients from "./views/Patients";
 import Login from "./views/Login";
-import PublicConfirmation from "./src/views/PublicConfirmation";
+import PublicConfirmation from "./views/PublicConfirmation";
 import { Menu, Coffee } from "lucide-react";
 
 interface User {

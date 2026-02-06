@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
-import { dateLocale } from "../src/lib/i18n";
+import { dateLocale } from "../lib/i18n";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import {
   FileText,
@@ -20,8 +20,8 @@ import { appointmentService } from "../services/features/appointments/appointmen
 import { expenseService } from "../services/features/expenses/expense.service";
 import { generateReportPDF } from "../services/supabaseService";
 import { Alert } from "../components/ui/Alert";
-import { DatePickerInput } from "../src/components/ui/DatePickerInput";
-import { useClickOutside } from "../src/hooks/useClickOutside";
+import { DatePickerInput } from "../components/ui/DatePickerInput";
+import { useClickOutside } from "../hooks/useClickOutside";
 
 const Reports: React.FC = () => {
   const [generatingReport, setGeneratingReport] = useState<string | null>(null);

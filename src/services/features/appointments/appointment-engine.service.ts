@@ -3,7 +3,7 @@
 // Created: 2026-02-06
 // ────────────────────────────────────────────────────────────────────────────
 
-import { supabase } from '../../../src/lib/supabase';
+import { supabase } from '../../../lib/supabase';
 
 export interface AppointmentData {
     patient_id: string;
