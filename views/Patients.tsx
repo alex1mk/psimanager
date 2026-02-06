@@ -18,6 +18,7 @@ import {
   CheckCircle,
   FileSpreadsheet,
   Upload,
+  CalendarClock,
 } from "lucide-react";
 import { Patient, PaymentType, Appointment } from "../types";
 import {
@@ -30,6 +31,8 @@ import { DatePickerInput } from "../src/components/ui/DatePickerInput";
 import { useClickOutside } from "../src/hooks/useClickOutside";
 import ExcelJS from "exceljs";
 import { supabase } from "../src/lib/supabase";
+import { AppointmentEngine } from "../services/features/appointments/appointment-engine.service";
+import PreScheduleModal from "../src/components/appointments/PreScheduleModal";
 
 // Mapeamento de valores Excel → Banco (PT-BR)
 const PAYMENT_TYPE_MAP: Record<string, string> = {
@@ -73,6 +76,8 @@ const Patients: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPreScheduleModalOpen, setIsPreScheduleModalOpen] = useState(false);
+  const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [alert, setAlert] = useState<{
@@ -206,44 +211,33 @@ const Patients: React.FC = () => {
       } else {
         let createdPatient: Patient | null = null;
         try {
-          // Ensure we don't pass an empty string ID for creation
-          const { id, ...createData } = patientData as any;
+          // Normalizar e enviar dados
+          const { id, ...createData } = patientData;
           createdPatient = await patientService.create(createData as Patient);
 
-          // Auto-generate first appointment
+          // Agora usamos o AppointmentEngine para criar o primeiro agendamento
+          // e enviar as notificações (que agora devem vir dele ou da Edge Function trigger)
           try {
-            const newAppointment: Appointment = {
-              id: Math.random().toString(36).substr(2, 9),
-              patientId: createdPatient.id,
-              patientName: createdPatient.name,
-              date: formDate,
-              time: createdPatient.fixedTime,
-              status: "scheduled",
-              source: "internal",
-              notes: "Primeira consulta (Gerada automaticamente no cadastro)",
-            };
-            await createAppointment(newAppointment);
+            console.log(`[Patients] Inicializando motor para ${createdPatient.name}`);
 
-            // Send notification sequentially with await
-            const notificationTypes = ["whatsapp", "email"] as const;
-            for (const type of notificationTypes) {
-              try {
-                console.log(
-                  `[Patients] Disparando ${type} para ${createdPatient.name}`,
-                );
-                await sendNotification(type, createdPatient.name, formDate);
-              } catch (e) {
-                console.warn(`${type} notification skipped`, e);
-              }
-            }
+            // Passo 1: Criar agendamento inicial via engine
+            // O engine já cuida da validação e conflitos
+            const appResult = await AppointmentEngine.createAppointment({
+              patient_id: createdPatient.id,
+              scheduled_date: formDate,
+              scheduled_time: createdPatient.fixedTime,
+              recurrence_type: 'weekly' // Padrão para novos pacientes
+            }, 'pending_confirmation');
+
+            if (!appResult.success) throw new Error(appResult.error);
 
             setPatients((prev) => [...prev, createdPatient!]);
             setAlert({
               type: "success",
               message: "Paciente salvo e agendado com sucesso!",
             });
-          } catch (appErr) {
-            console.error("Error creating initial appointment:", appErr);
+          } catch (appErr: any) {
+            console.error("Error creating initial appointment with engine:", appErr);
             setPatients((prev) => [...prev, createdPatient!]);
             setAlert({
               type: "success",
@@ -582,16 +576,26 @@ const Patients: React.FC = () => {
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
                       <button
+                        onClick={() => {
+                          setSelectedPatientId(patient.id);
+                          setIsPreScheduleModalOpen(true);
+                        }}
+                        className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-xl transition-all border border-transparent hover:border-green-100 shadow-sm"
+                        title="Iniciar Pré-Agendamento"
+                      >
+                        <CalendarClock size={16} />
+                      </button>
+                      <button
                         onClick={() => handleOpenModal(patient)}
-                        className="p-2 text-verde-botanico/40 hover:text-verde-botanico hover:bg-bege-calmo rounded-xl transition-all"
-                        title="Editar"
+                        className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all border border-transparent hover:border-blue-100 shadow-sm"
+                        title="Editar Ficha"
                       >
                         <Edit2 size={16} />
                       </button>
                       <button
                         onClick={() => handleOpenDeleteModal(patient.id)}
-                        className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                        title="Excluir"
+                        className="p-2 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100 shadow-sm"
+                        title="Excluir Paciente"
                       >
                         <Trash size={16} />
                       </button>
@@ -877,6 +881,23 @@ const Patients: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Pre-Schedule Modal */}
+      <PreScheduleModal
+        isOpen={isPreScheduleModalOpen}
+        onClose={() => {
+          setIsPreScheduleModalOpen(false);
+          setSelectedPatientId(undefined);
+        }}
+        onSuccess={() => {
+          setAlert({
+            type: "success",
+            message: "Pré-agendamento realizado com sucesso!",
+          });
+          fetchPatients();
+        }}
+        patients={patients}
+        initialPatientId={selectedPatientId}
+      />
     </div>
   );
 };

@@ -35,6 +35,7 @@ import {
   Save,
   ChevronLeft,
   ChevronRight,
+  CalendarClock,
 } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
@@ -43,6 +44,9 @@ import "../src/styles/agenda.css";
 import { Appointment, Patient } from "../types";
 import { appointmentService } from "../services/features/appointments/appointment.service";
 import { patientService } from "../services/features/patients/patient.service";
+import PreScheduleModal from "../src/components/appointments/PreScheduleModal";
+import { useAppointmentSync } from "../src/hooks/useAppointmentSync";
+import { GoogleCalendarService } from "../services/integrations/google-calendar.service";
 import {
   sendNotification,
   connectGoogleCalendar,
@@ -72,6 +76,7 @@ const Agenda: React.FC = () => {
 
   // New Appointment Modal State
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [isPreScheduleModalOpen, setIsPreScheduleModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [newAppointment, setNewAppointment] = useState({
     patientId: "",
@@ -91,9 +96,30 @@ const Agenda: React.FC = () => {
 
   // Google Calendar State
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
+  const [googleCalendarConfigured, setGoogleCalendarConfigured] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
+
+  const checkGoogleCalendarConfig = useCallback(async () => {
+    try {
+      const isConfigured = await GoogleCalendarService.checkConfiguration();
+      setGoogleCalendarConfigured(isConfigured);
+      setIsGoogleConnected(isConfigured); // Assuming connection status follows config for now
+    } catch (err) {
+      console.warn('[Agenda] Erro ao verificar Google Calendar:', err);
+      setGoogleCalendarConfigured(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkGoogleCalendarConfig();
+  }, [checkGoogleCalendarConfig]);
+
+  // Hook de Sincronização em Tempo Real (Google Calendar)
+  useAppointmentSync(useCallback(() => {
+    appointmentService.getAll().then(setAppointments);
+  }, []));
 
   const daysInMonth = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentDate), { weekStartsOn: 0 });
@@ -367,10 +393,12 @@ const Agenda: React.FC = () => {
           </h2>
           <p className="text-verde-botanico/60 italic font-sans text-sm">
             Seu planner pessoal de cuidado e acolhimento.
+            {googleCalendarConfigured ? ' • ✅ Google Calendar conectado' : ' • ⚠️ Google Calendar não configurado'}
           </p>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          {/* Google Sync Button */}
           <button
             onClick={handleConnectGoogle}
             disabled={isSyncing || isGoogleConnected}
@@ -378,6 +406,7 @@ const Agenda: React.FC = () => {
               ? "bg-verde-botanico/10 text-verde-botanico border-verde-botanico/20"
               : "bg-white text-verde-botanico border-verde-botanico/20 hover:shadow-md"
               }`}
+            title={isGoogleConnected ? "Agenda sincronizada" : "Sincronizar com Google Agenda"}
           >
             {isSyncing ? (
               <Loader2 size={16} className="animate-spin" />
@@ -386,17 +415,27 @@ const Agenda: React.FC = () => {
             ) : (
               <LinkIcon size={16} />
             )}
-            {isGoogleConnected ? "Sincronizado" : "Sincronizar Google"}
+            <span className="hidden lg:inline">
+              {isGoogleConnected ? "Sincronizado" : "Sincronizar"}
+            </span>
           </button>
 
+          {/* Action: Request Confirmation (Secondary Action but emphasized) */}
+          <button
+            onClick={() => setIsPreScheduleModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 border border-green-600 text-green-700 font-bold rounded-xl hover:bg-green-50 transition-all duration-300 shadow-sm"
+          >
+            <CalendarClock size={18} />
+            <span className="hidden sm:inline">Solicitar Confirmação</span>
+          </button>
+
+          {/* Action: New Appointment (Primary Action) */}
           <button
             onClick={() => setIsNewModalOpen(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-verde-botanico text-white rounded-xl hover:bg-verde-botanico/90 shadow-md hover:shadow-lg transition-all duration-300 ml-auto md:ml-0"
+            className="flex items-center gap-2 px-4 py-2.5 bg-verde-botanico text-white rounded-xl hover:bg-verde-botanico/90 shadow-md hover:shadow-lg transition-all duration-300 font-bold"
           >
             <Plus size={20} />
-            <span className="hidden sm:inline font-medium">
-              Novo Agendamento
-            </span>
+            <span className="hidden sm:inline">Novo Agendamento</span>
           </button>
         </div>
       </div>
@@ -855,6 +894,19 @@ const Agenda: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Pre-Schedule Modal */}
+      <PreScheduleModal
+        isOpen={isPreScheduleModalOpen}
+        onClose={() => setIsPreScheduleModalOpen(false)}
+        onSuccess={() => {
+          setNotificationStatus({
+            type: "success",
+            message: "Pré-agendamento realizado com sucesso!",
+          });
+          appointmentService.getAll().then(setAppointments);
+        }}
+        patients={patients}
+      />
     </div>
   );
 };

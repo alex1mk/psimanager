@@ -30,50 +30,83 @@ serve(async (req) => {
             );
         }
 
-        // Buscar token com appointment e patient
+        // 1. Tentar buscar token no banco (Fluxo Novo)
         const { data: tokenData, error: tokenError } = await supabase
             .from("confirmation_tokens")
             .select("*, appointment:appointments(*, patient:patients(name))")
             .eq("token", token)
             .single();
 
-        if (tokenError || !tokenData) {
-            console.error("[get-appointment-by-token] Token not found:", token);
+        if (tokenData && !tokenError) {
+            // Verificar expiração
+            if (new Date(tokenData.expires_at) < new Date()) {
+                return new Response(JSON.stringify({ error: "Token expirado" }), { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            }
+            if (tokenData.used_at) {
+                return new Response(JSON.stringify({ error: "Token já utilizado" }), { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            }
+
             return new Response(
-                JSON.stringify({ error: "Token inválido" }),
-                { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                JSON.stringify({
+                    appointment: {
+                        patient_name: tokenData.appointment.patient.name,
+                        suggested_date: tokenData.appointment.scheduled_date,
+                        suggested_time: tokenData.appointment.scheduled_time,
+                    },
+                }),
+                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
-        // Verificar expiração
-        if (new Date(tokenData.expires_at) < new Date()) {
-            console.log("[get-appointment-by-token] Token expired:", token);
-            return new Response(
-                JSON.stringify({ error: "Token expirado" }),
-                { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-        }
+        // 2. Fallback: Validar HMAC se patient_id for fornecido (Fluxo Legado/Seguro)
+        const url = new URL(req.url);
+        const patient_id = url.searchParams.get("patient_id") || (await req.clone().json()).patient_id;
 
-        // Verificar se já foi usado
-        if (tokenData.used_at) {
-            console.log("[get-appointment-by-token] Token already used:", token);
-            return new Response(
-                JSON.stringify({ error: "Token já utilizado" }),
-                { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-        }
+        if (patient_id) {
+            const secret = Deno.env.get("CONFIRMATION_SECRET") || "your-secret-key-here";
+            const expectedToken = await crypto.subtle
+                .digest("SHA-256", new TextEncoder().encode(`${patient_id}:${secret}`))
+                .then((buffer) =>
+                    Array.from(new Uint8Array(buffer))
+                        .map((b) => b.toString(16).padStart(2, "0"))
+                        .join(""),
+                );
 
-        console.log("[get-appointment-by-token] ✅ Valid token for patient:", tokenData.appointment.patient.name);
+            if (token === expectedToken) {
+                // Token validado via HMAC! Buscar dados do paciente
+                const { data: patient, error: pError } = await supabase
+                    .from("patients")
+                    .select("name, id")
+                    .eq("id", patient_id)
+                    .single();
+
+                if (!pError && patient) {
+                    // Buscar último agendamento pendente
+                    const { data: appointment } = await supabase
+                        .from("appointments")
+                        .select("*")
+                        .eq("patient_id", patient_id)
+                        .order("created_at", { ascending: false })
+                        .limit(1)
+                        .single();
+
+                    return new Response(
+                        JSON.stringify({
+                            appointment: {
+                                patient_name: patient.name,
+                                suggested_date: appointment?.scheduled_date,
+                                suggested_time: appointment?.scheduled_time,
+                            },
+                        }),
+                        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                    );
+                }
+            }
+        }
 
         return new Response(
-            JSON.stringify({
-                appointment: {
-                    patient_name: tokenData.appointment.patient.name,
-                    suggested_date: tokenData.appointment.scheduled_date,
-                    suggested_time: tokenData.appointment.scheduled_time,
-                },
-            }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({ error: "Token inválido ou expirado" }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     } catch (error) {
         console.error("[get-appointment-by-token] Error:", error);

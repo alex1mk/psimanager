@@ -39,9 +39,16 @@ serve(async (req) => {
 
     const { id, name, email, phone } = payload.record;
 
-    // 1. Generate Secure Confirmation Link with HMAC Token
+    // 1. Generate Link for the new Public Confirmation Portal (Vercel)
+    const appUrl = "https://psimanager-bay.vercel.app"; // URL principal do app
+
+    // Validar se já existe um token para este agendamento/paciente
+    // Nota: O trigger vem do INSERT do patient, mas o agendamento pode ainda não existir
+    // ou ser criado simultaneamente pelo frontend.
+
     const secret = Deno.env.get("CONFIRMATION_SECRET") || "your-secret-key-here";
-    const token = await crypto.subtle
+    // Gerar HMAC para compatibilidade legada ou fallback
+    const hmacToken = await crypto.subtle
       .digest("SHA-256", new TextEncoder().encode(`${id}:${secret}`))
       .then((buffer) =>
         Array.from(new Uint8Array(buffer))
@@ -49,16 +56,15 @@ serve(async (req) => {
           .join(""),
       );
 
-    const projectUrl =
-      Deno.env.get("SUPABASE_URL") ?? "https://[YOUR_PROJECT_REF].supabase.co";
-    const confirmLink = `${projectUrl}/functions/v1/confirm-scheduling?patient_id=${id}&token=${token}`;
+    // Link oficial apontando para o PORTAL (Frontend) e não mais para a Edge Function direta
+    const confirmLink = `${appUrl}/confirmar?token=${hmacToken}&patient_id=${id}`;
 
     // 2. Determine Recipients (Test Mode Support)
     const adminEmail = Deno.env.get("ADMIN_EMAIL");
     const toEmail = adminEmail || email;
 
     console.log(`[Function] Sending Email to ${toEmail}`);
-    console.log(`[Link] Generated: ${confirmLink}`);
+    console.log(`[Link] Generated (Portal): ${confirmLink}`);
 
     // 3. Send Email (Resend)
     const results: any = { email: null, whatsapp: null };

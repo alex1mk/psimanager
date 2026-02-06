@@ -24,12 +24,13 @@ export interface Appointment {
   id: string;
   patientId: string;
   patientName: string;
-  date: string; // ISO Date
+  date: string; // ISO Date (YYYY-MM-DD)
   time: string;
-  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'pending_confirmation' | 'draft';
+  recurrence_type?: 'single' | 'weekly' | 'biweekly' | 'monthly';
   notes?: string;
-  source?: 'internal' | 'google'; // New field for sync
-  googleId?: string; // New field for sync reference
+  google_event_id?: string;
+  source?: 'internal' | 'google';
 }
 
 export interface Expense {

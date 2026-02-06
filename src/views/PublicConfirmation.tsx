@@ -29,6 +29,7 @@ export default function PublicConfirmation() {
         // Pegar token da URL
         const params = new URLSearchParams(window.location.search);
         const urlToken = params.get('token');
+        const patientId = params.get('patient_id');
 
         if (!urlToken) {
             setError('Link inválido');
@@ -37,17 +38,17 @@ export default function PublicConfirmation() {
         }
 
         setToken(urlToken);
-        loadAppointmentData(urlToken);
+        loadAppointmentData(urlToken, patientId);
     }, []);
 
-    const loadAppointmentData = async (token: string) => {
+    const loadAppointmentData = async (token: string, patient_id?: string | null) => {
         try {
             const response = await fetch(
                 `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-appointment-by-token`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token }),
+                    body: JSON.stringify({ token, patient_id }),
                 }
             );
 
@@ -91,6 +92,7 @@ export default function PublicConfirmation() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         token,
+                        patient_id: new URLSearchParams(window.location.search).get('patient_id'),
                         date: selectedDate,
                         time: selectedTime,
                         recurrence,

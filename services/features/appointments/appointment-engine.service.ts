@@ -96,6 +96,10 @@ export class AppointmentEngine {
         status: 'draft' | 'pending_confirmation' | 'confirmed' = 'draft'
     ): Promise<{ success: boolean; appointment?: any; error?: string }> {
         try {
+            // 0. Pegar user_id
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Usuário não autenticado');
+
             // 1. Validar disponibilidade
             const validation = await this.validateAvailability(
                 data.scheduled_date,
@@ -121,6 +125,7 @@ export class AppointmentEngine {
                     recurrence_type: data.recurrence_type,
                     recurrence_end_date: data.recurrence_end_date,
                     notes: data.notes,
+                    user_id: user.id
                 })
                 .select(`
           *,
@@ -269,8 +274,8 @@ export class AppointmentEngine {
 
             if (error) throw error;
 
-            // 4. Gerar link
-            const appUrl = import.meta.env.VITE_APP_URL || 'http://localhost:5173';
+            // 4. Gerar link (Vercel Portal)
+            const appUrl = "https://psimanager-bay.vercel.app";
             const link = `${appUrl}/confirmar?token=${token}`;
 
             console.log('[AppointmentEngine] ✅ Token gerado:', token);
