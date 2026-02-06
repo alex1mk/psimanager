@@ -87,7 +87,7 @@ export const analyzeReceiptOCR = async (file: File): Promise<Partial<Expense>> =
     }
 }
 
-// Notification - Placeholder for Twilio/Resend
+// Notification - Placeholder for n8n webhook / Resend email
 export const sendNotification = async (type: 'whatsapp' | 'email', patientName: string, date: string): Promise<boolean> => {
     await ensureAuthenticated()
     // Log intent to Supabase or Console
