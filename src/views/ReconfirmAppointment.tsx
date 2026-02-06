@@ -31,7 +31,7 @@ export default function ReconfirmAppointment() {
                     <CheckCircle className="w-10 h-10 text-green-600" />
                 </div>
 
-                <h1 className="text-3xl font-bold text-gray-800 mb-2 font-handwriting">
+                <h1 className="text-3xl font-bold text-gray-800 mb-2 font-sans">
                     Presença Confirmada!
                 </h1>
 

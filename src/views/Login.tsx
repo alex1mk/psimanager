@@ -83,13 +83,13 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <div className="w-16 h-16 bg-verde-botanico rounded-2xl flex items-center justify-center shadow-lg transform -rotate-6">
-            <span className="text-bege-calmo font-handwriting text-3xl">P</span>
+            <span className="text-bege-calmo font-sans text-3xl">P</span>
           </div>
         </div>
         <h2 className="mt-6 text-center text-4xl font-display text-verde-botanico tracking-tight">
           PsiManager
         </h2>
-        <p className="mt-2 text-center text-lg text-verde-botanico/80 font-handwriting">
+        <p className="mt-2 text-center text-lg text-verde-botanico/80 font-sans">
           Gestão Clínica Inteligente & Humanizada
         </p>
       </div>

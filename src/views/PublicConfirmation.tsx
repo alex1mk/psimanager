@@ -202,7 +202,7 @@ export default function PublicConfirmation() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full font-handwriting">
+            <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full font-sans">
                 <h1 className="text-3xl font-bold text-verde-botanico mb-4 font-sans">
                     Confirmar Agendamento
                 </h1>

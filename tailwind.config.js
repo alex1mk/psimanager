@@ -47,10 +47,10 @@ export default {
                 },
             },
             fontFamily: {
-                sans: ['Inter', 'sans-serif'],
-                serif: ['Playfair Display', 'serif'],
-                display: ['Playfair Display', 'serif'],
-                handwriting: ['"Playwrite NZ"', 'cursive'],
+                sans: ['Sniglet', 'sans-serif'],
+                serif: ['Sniglet', 'sans-serif'],
+                display: ['Sniglet', 'sans-serif'],
+                handwriting: ['Sniglet', 'sans-serif'],
             },
             borderRadius: {
                 lg: "var(--radius)",
