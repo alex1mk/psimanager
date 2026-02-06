@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Sidebar from "./components/Sidebar";
 import Dashboard from "./views/Dashboard";
 import Agenda from "./views/Agenda";
@@ -6,6 +6,7 @@ import Expenses from "./views/Expenses";
 import Reports from "./views/Reports";
 import Patients from "./views/Patients";
 import Login from "./views/Login";
+import PublicConfirmation from "./src/views/PublicConfirmation";
 import { Menu, Coffee } from "lucide-react";
 
 interface User {
@@ -18,9 +19,18 @@ const App: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [isPublicRoute, setIsPublicRoute] = useState(false);
 
   // Sidebar State
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    // Detectar se é uma rota pública (ex: /confirmar?token=...)
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('token')) {
+      setIsPublicRoute(true);
+    }
+  }, []);
 
   const handleLogin = (userData: User) => {
     setUser(userData);
@@ -49,6 +59,11 @@ const App: React.FC = () => {
         return <Dashboard onNavigate={setCurrentView} />;
     }
   };
+
+  // Se for rota pública, renderiza sem autenticação
+  if (isPublicRoute) {
+    return <PublicConfirmation />;
+  }
 
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
@@ -152,9 +167,8 @@ const App: React.FC = () => {
       )}
 
       <main
-        className={`flex-1 p-6 md:p-10 pt-20 md:pt-10 transition-all duration-300 ease-in-out relative z-10 ${
-          isSidebarCollapsed ? "md:ml-20" : "md:ml-64"
-        }`}
+        className={`flex-1 p-6 md:p-10 pt-20 md:pt-10 transition-all duration-300 ease-in-out relative z-10 ${isSidebarCollapsed ? "md:ml-20" : "md:ml-64"
+          }`}
       >
         {renderView()}
       </main>
