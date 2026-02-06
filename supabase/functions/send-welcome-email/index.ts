@@ -1,13 +1,13 @@
-// Setup type definitions for built-in Supabase Runtime APIs
+// ─── MODIFICAÇÃO: Removida dependência do Twilio ───────────────────────────
+// Motivo: Limpeza de código obsoleto - Twilio descontinuado
+// Impacto: Apenas email é enviado; WhatsApp será via n8n no futuro
+// Data: 2026-02-06
+// ────────────────────────────────────────────────────────────────────────────
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
-import twilio from "npm:twilio@4.19.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
-const twilioClient = twilio(
-  Deno.env.get("TWILIO_ACCOUNT_SID"),
-  Deno.env.get("TWILIO_AUTH_TOKEN"),
-);
 
 interface WebhookPayload {
   type: "INSERT" | "UPDATE" | "DELETE";
@@ -57,72 +57,47 @@ serve(async (req) => {
     const adminEmail = Deno.env.get("ADMIN_EMAIL");
     const toEmail = adminEmail || email;
 
-    const adminPhone = Deno.env.get("ADMIN_PHONE");
-    const toPhone = adminPhone || phone;
-
-    console.log(
-      `Sending Notifications -> Email: ${toEmail}, WhatsApp: ${toPhone}`,
-    );
-
-    // 3. Send Email (Resend)
-    const emailPromise = resend.emails.send({
-      from: "Atendimento <onboarding@resend.dev>",
-      to: [toEmail],
-      subject: `Bem-vindo(a), ${name}! Confirme seu horário.`,
-      html: `
-        <div style="font-family: sans-serif; color: #333;">
-          <h1>Olá, ${name}!</h1>
-          <p>Seja bem-vindo(a) ao Psimanager.</p>
-          <p>Para confirmar seu agendamento, clique no botão abaixo:</p>
-          <a href="${confirmLink}" style="background-color: #2C7E20; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Confirmar Presença</a>
-          <p style="margin-top: 20px; font-size: 12px; color: #666;">
-            Link: ${confirmLink}
-          </p>
-          <hr />
-          <p style="font-size: 10px; color: #999;">
-            Enviado para: ${email}
-          </p>
-        </div>
-      `,
-    });
-
-    // 4. Send WhatsApp Notification
-    const twilioSender = Deno.env.get("TWILIO_WHATSAPP_NUMBER") || "whatsapp:+14155238886";
-
-    // Normalize phone (Brazil +55)
-    let cleanPhone = toPhone.replace(/\D/g, "");
-    if (cleanPhone.length === 11 || cleanPhone.length === 10) {
-      cleanPhone = "55" + cleanPhone;
-    } else if (!cleanPhone.startsWith("55") && cleanPhone.length > 0) {
-      cleanPhone = "55" + cleanPhone;
-    }
-    const formattedToPhone = `whatsapp:+${cleanPhone}`;
-
-    const results: any = { email: null, whatsapp: null };
-
     console.log(`[Function] Sending Email to ${toEmail}`);
     console.log(`[Link] Generated: ${confirmLink}`);
 
+    // 3. Send Email (Resend)
+    const results: any = { email: null, whatsapp: null };
+
     try {
-      results.email = await emailPromise;
+      results.email = await resend.emails.send({
+        from: "Atendimento <onboarding@resend.dev>",
+        to: [toEmail],
+        subject: `Bem-vindo(a), ${name}! Confirme seu horário.`,
+        html: `
+          <div style="font-family: sans-serif; color: #333;">
+            <h1>Olá, ${name}!</h1>
+            <p>Seja bem-vindo(a) ao Psimanager.</p>
+            <p>Para confirmar seu agendamento, clique no botão abaixo:</p>
+            <a href="${confirmLink}" style="background-color: #2C7E20; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Confirmar Presença</a>
+            <p style="margin-top: 20px; font-size: 12px; color: #666;">
+              Link: ${confirmLink}
+            </p>
+            <hr />
+            <p style="font-size: 10px; color: #999;">
+              Enviado para: ${email}
+            </p>
+          </div>
+        `,
+      });
       console.log("Email sent successfully");
     } catch (e) {
       console.error("Email failed:", e);
       results.email = { status: "rejected", reason: e.message };
     }
 
-    console.log(`[Function] Sending WhatsApp to ${formattedToPhone}`);
-    try {
-      results.whatsapp = await twilioClient.messages.create({
-        body: `Olá ${name}! Bem-vindo(a) ao Psimanager. 📝\n\nPor favor, confirme seu agendamento clicando aqui:\n${confirmLink}`,
-        from: twilioSender,
-        to: formattedToPhone,
-      });
-      console.log("WhatsApp sent successfully SID:", results.whatsapp.sid);
-    } catch (e) {
-      console.error("WhatsApp failed:", e);
-      results.whatsapp = { status: "rejected", reason: e.message };
-    }
+    // 4. WhatsApp Placeholder (n8n integration pending)
+    // TODO: Implementar via n8n webhook quando configurado
+    console.log(`[WhatsApp] 📋 Notificação pendente para: ${phone}`);
+    console.log("[WhatsApp] ⏳ Aguardando configuração do webhook n8n...");
+    results.whatsapp = {
+      status: "pending",
+      message: "WhatsApp via n8n não configurado"
+    };
 
     console.log("Notification Results:", results);
 

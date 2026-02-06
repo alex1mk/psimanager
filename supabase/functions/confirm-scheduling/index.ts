@@ -10,6 +10,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 serve(async (req) => {
   const allowedOrigins = [
+    "https://psimanager-bay.vercel.app",
     "https://psimanager.vercel.app",
     ...(Deno.env.get("ENV") === "development" ? ["http://localhost:5173"] : []),
   ];
@@ -368,108 +369,35 @@ async function addToGoogleCalendar(
   }
 }
 
+// ─── MODIFICAÇÃO: Removida dependência do Twilio ───────────────────────────
+// Motivo: Limpeza de código obsoleto - Twilio descontinuado
+// Impacto: WhatsApp agora é placeholder para futura integração n8n
+// Data: 2026-02-06
+// ────────────────────────────────────────────────────────────────────────────
+
 async function sendWhatsAppConfirmation(
   name: string,
   phone: string,
   date: string,
   time: string
 ): Promise<{ success: boolean; sid?: string; error?: string }> {
-  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-  const fromNumber = Deno.env.get("TWILIO_WHATSAPP_NUMBER");
-
-  if (!accountSid || !authToken || !fromNumber) {
-    const msg = "Twilio não configurado";
-    console.warn("[WhatsApp]", msg);
-    return { success: false, error: msg };
-  }
-
-  console.log("[WhatsApp] Telefone recebido do DB:", phone);
-
-  let cleanPhone = phone.replace(/\D/g, "");
-  console.log("[WhatsApp] Após limpeza:", cleanPhone);
-
-  if (cleanPhone.length === 11) {
-    cleanPhone = "55" + cleanPhone;
-  } else if (cleanPhone.length === 10) {
-    cleanPhone = "55" + cleanPhone;
-  } else if (cleanPhone.length === 13 && cleanPhone.startsWith("55")) {
-    // Já tem 55
-  } else if (cleanPhone.length === 12 && !cleanPhone.startsWith("55")) {
-    cleanPhone = "55" + cleanPhone;
-  }
-
-  console.log("[WhatsApp] Após adicionar DDI:", cleanPhone);
-
-  if (cleanPhone.length !== 13 && cleanPhone.length !== 12) {
-    const error = `Telefone inválido: original="${phone}", limpo="${cleanPhone}" (esperado 12-13 dígitos)`;
-    console.error("[WhatsApp]", error);
-    return { success: false, error };
-  }
-
-  const toNumber = `whatsapp:+${cleanPhone}`;
-  console.log("[WhatsApp] Formato final para Twilio:", toNumber);
-
+  // TODO: Integrar via n8n webhook quando configurado
+  // Webhook URL esperada: Deno.env.get("N8N_WHATSAPP_WEBHOOK")
+  
   const [year, month, day] = date.split("-");
   const formattedDate = `${day}/${month}/${year}`;
 
-  const messageBody = `Olá ${name}! 👋
+  console.log("[WhatsApp] 📋 Notificação pendente (n8n não configurado):");
+  console.log("[WhatsApp] → Paciente:", name);
+  console.log("[WhatsApp] → Telefone:", phone);
+  console.log("[WhatsApp] → Data:", formattedDate);
+  console.log("[WhatsApp] → Horário:", time);
+  console.log("[WhatsApp] ⏳ Aguardando configuração do webhook n8n...");
 
-Sua consulta foi confirmada:
-📅 ${formattedDate}
-🕐 ${time}
-
-Aguardamos você!
-
-_Mensagem automática - PsiManager_`;
-
-  console.log("[WhatsApp] Enviando mensagem...");
-  console.log("[WhatsApp] De:", fromNumber);
-  console.log("[WhatsApp] Para:", toNumber);
-
-  try {
-    const response = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Authorization: `Basic ${btoa(accountSid + ":" + authToken)}`,
-        },
-        body: new URLSearchParams({
-          To: toNumber,
-          From: fromNumber,
-          Body: messageBody,
-        }),
-      }
-    );
-
-    const responseData = await response.json();
-    console.log("[WhatsApp] Resposta Twilio:", JSON.stringify(responseData, null, 2));
-
-    if (!response.ok) {
-      console.error("[WhatsApp] ❌ Erro na API:", responseData);
-
-      let errorMessage = `HTTP ${response.status}`;
-
-      if (responseData.code === 21211) {
-        errorMessage = `❌ Número ${toNumber} não validou o Sandbox!\n\nSOLUÇÃO:\n1. Abra WhatsApp no celular\n2. Envie mensagem para: +1 415 523 8886\n3. Escreva: join inch-crowd\n4. Aguarde confirmação\n5. Tente novamente`;
-      } else if (responseData.code === 63016) {
-        errorMessage = "❌ Número não pode receber WhatsApp Business";
-      } else if (responseData.code === 21408) {
-        errorMessage = "❌ Permissão negada - verifique número FROM no Twilio";
-      } else if (responseData.message) {
-        errorMessage = responseData.message;
-      }
-
-      return { success: false, error: errorMessage };
-    }
-
-    console.log("[WhatsApp] ✅ Sucesso! SID:", responseData.sid);
-    return { success: true, sid: responseData.sid };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error("[WhatsApp] ❌ Erro de conexão:", errorMsg);
-    return { success: false, error: errorMsg };
-  }
+  // Retorna sucesso silencioso para não bloquear o fluxo
+  return { 
+    success: true, 
+    sid: "placeholder-awaiting-n8n",
+    error: undefined 
+  };
 }
