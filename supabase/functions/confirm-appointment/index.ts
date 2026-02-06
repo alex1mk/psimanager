@@ -23,7 +23,16 @@ serve(async (req) => {
     }
 
     try {
-        const { token, date, time, recurrence } = await req.json();
+        const {
+            token,
+            date,
+            time,
+            recurrence,
+            payment_method,
+            payment_due_day,
+            additional_email,
+            additional_phone
+        } = await req.json();
 
         // 1. Validar token
         let targetAppointmentId = null;
@@ -36,7 +45,6 @@ serve(async (req) => {
             .single();
 
         if (tokenData && !tokenError) {
-            // Fluxo UUID Token
             if (new Date(tokenData.expires_at) < new Date()) {
                 return new Response(JSON.stringify({ error: "Token expirado" }), { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } });
             }
@@ -47,7 +55,6 @@ serve(async (req) => {
             patientDetails = tokenData.appointment.patient;
         } else {
             // Fluxo HMAC Fallback
-            // Clone the request to read the body again for patient_id
             const body = await req.clone().json();
             const patient_id = body.patient_id;
             if (patient_id) {
@@ -61,13 +68,12 @@ serve(async (req) => {
                     );
 
                 if (token === expectedToken) {
-                    // Buscar último agendamento pendente e detalhes do paciente
                     const { data: patient } = await supabase.from("patients").select("*").eq("id", patient_id).single();
                     const { data: appointment } = await supabase
                         .from("appointments")
                         .select("id")
                         .eq("patient_id", patient_id)
-                        .eq("status", "pending") // Only consider pending appointments for HMAC fallback
+                        .eq("status", "pending_confirmation") // Updated status check
                         .order("created_at", { ascending: false })
                         .limit(1)
                         .single();
@@ -84,6 +90,7 @@ serve(async (req) => {
                 { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
+
         // 2. Validar conflito de horário
         const { data: conflicts } = await supabase
             .from("appointments")
@@ -100,7 +107,34 @@ serve(async (req) => {
             );
         }
 
-        // 3. Atualizar agendamento
+        // 3. Atualizar Dados do Paciente (Pagamento e Contatos)
+        const patientUpdates: any = {};
+        if (payment_method) patientUpdates.payment_method = payment_method;
+        if (payment_due_day) patientUpdates.payment_due_day = payment_due_day;
+
+        // Append additional contacts if provided and not duplicate
+        // Note: Logic simplified for brevity, in production consider deduping
+        if (additional_email) {
+            const existingEmails = patientDetails.additional_emails || [];
+            if (!existingEmails.includes(additional_email)) {
+                patientUpdates.additional_emails = [...existingEmails, additional_email];
+            }
+        }
+        if (additional_phone) {
+            const existingPhones = patientDetails.additional_phones || [];
+            if (!existingPhones.includes(additional_phone)) {
+                patientUpdates.additional_phones = [...existingPhones, additional_phone];
+            }
+        }
+
+        if (Object.keys(patientUpdates).length > 0) {
+            await supabase
+                .from("patients")
+                .update(patientUpdates)
+                .eq("id", patientDetails.id);
+        }
+
+        // 4. Atualizar Agendamento
         const { error: updateError } = await supabase
             .from("appointments")
             .update({
@@ -113,7 +147,7 @@ serve(async (req) => {
 
         if (updateError) throw updateError;
 
-        // 4. Marcar token como usado
+        // 5. Marcar token como usado (se UUID)
         if (tokenData) {
             await supabase
                 .from("confirmation_tokens")
@@ -121,7 +155,7 @@ serve(async (req) => {
                 .eq("token", token);
         }
 
-        // 5. Sincronizar com Google Calendar
+        // 6. Sincronizar com Google Calendar
         const calendarResult = await syncGoogleCalendar(
             patientDetails.name,
             date,
@@ -136,7 +170,7 @@ serve(async (req) => {
                 .eq("id", targetAppointmentId);
         }
 
-        // 6. Enviar e-mail de confirmação (opcional)
+        // 7. Enviar e-mail de confirmação
         await sendConfirmationEmail(
             patientDetails.email,
             patientDetails.name,
@@ -144,12 +178,11 @@ serve(async (req) => {
             time
         );
 
-        console.log("[confirm-appointment] ✅ Confirmed:", targetAppointmentId);
-
         return new Response(
             JSON.stringify({ success: true }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
+
     } catch (error) {
         console.error("Error:", error);
         return new Response(

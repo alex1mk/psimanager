@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar, Clock, User, Copy, Mail, CheckCircle, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { supabase } from '../../lib/supabase';
 import { AppointmentEngine } from '../../services/features/appointments/appointment-engine.service';
 
 interface Patient {
@@ -20,6 +21,8 @@ interface PreScheduleModalProps {
 }
 
 type RecurrenceType = 'single' | 'weekly' | 'biweekly' | 'monthly';
+type PaymentMethod = 'card' | 'pix' | 'cash';
+type PaymentDueDay = '0' | '5' | '20';
 
 interface FormData {
     patient_id: string;
@@ -27,6 +30,8 @@ interface FormData {
     scheduled_time: string;
     recurrence_type: RecurrenceType;
     recurrence_end_date: string;
+    payment_method: PaymentMethod;
+    payment_due_day: PaymentDueDay;
     notes: string;
 }
 
@@ -49,6 +54,8 @@ export default function PreScheduleModal({
         scheduled_time: '',
         recurrence_type: 'single',
         recurrence_end_date: '',
+        payment_method: 'pix',
+        payment_due_day: '0',
         notes: '',
     });
 
@@ -71,6 +78,8 @@ export default function PreScheduleModal({
             scheduled_time: '',
             recurrence_type: 'single',
             recurrence_end_date: '',
+            payment_method: 'pix',
+            payment_due_day: '0',
             notes: '',
         });
         setErrors([]);
@@ -137,6 +146,22 @@ export default function PreScheduleModal({
         setErrors([]);
 
         try {
+            // 0. Atualizar dados financeiros do paciente (Path B)
+            if (formData.patient_id) {
+                const { error: updateError } = await supabase
+                    .from('patients')
+                    .update({
+                        payment_method: formData.payment_method,
+                        payment_due_day: parseInt(formData.payment_due_day)
+                    })
+                    .eq('id', formData.patient_id);
+
+                if (updateError) {
+                    console.warn('[PreScheduleModal] Erro ao atualizar paciente:', updateError);
+                    // Não bloqueamos o fluxo, mas logamos
+                }
+            }
+
             // 1. Criar agendamento com status pending_confirmation
             const createResult = await AppointmentEngine.createAppointment(
                 {
@@ -385,6 +410,38 @@ Aguardo sua confirmação! 💚`;
                                     )}
                                 </div>
                             )}
+
+                            {/* Pagamento (Novo Bloco) */}
+                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Forma de Pagamento
+                                    </label>
+                                    <select
+                                        value={formData.payment_method}
+                                        onChange={(e) => setFormData({ ...formData, payment_method: e.target.value as PaymentMethod })}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                    >
+                                        <option value="pix">PIX</option>
+                                        <option value="card">Cartão</option>
+                                        <option value="cash">Dinheiro</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Vencimento
+                                    </label>
+                                    <select
+                                        value={formData.payment_due_day}
+                                        onChange={(e) => setFormData({ ...formData, payment_due_day: e.target.value as PaymentDueDay })}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                    >
+                                        <option value="0">Na Consulta</option>
+                                        <option value="5">Dia 05</option>
+                                        <option value="20">Dia 20</option>
+                                    </select>
+                                </div>
+                            </div>
 
                             {/* Observações */}
                             <div>

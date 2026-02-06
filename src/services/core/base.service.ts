@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
+import { parseSupabaseError, showErrorToast } from '../../lib/error-handler'
 
 export abstract class BaseService {
     protected supabase: SupabaseClient
@@ -24,7 +25,6 @@ export abstract class BaseService {
      * Standardized error handler
      */
     protected handleError(error: any): never {
-        const { parseSupabaseError, showErrorToast } = require('../../lib/error-handler')
         const parsedError = parseSupabaseError(error)
         console.error(`[${this.tableName} Service Error]:`, parsedError)
         showErrorToast(error)

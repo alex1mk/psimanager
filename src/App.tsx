@@ -7,6 +7,7 @@ import Reports from "./views/Reports";
 import Patients from "./views/Patients";
 import Login from "./views/Login";
 import PublicConfirmation from "./views/PublicConfirmation";
+import ReconfirmAppointment from "./views/ReconfirmAppointment";
 import { Menu, Coffee } from "lucide-react";
 
 interface User {
