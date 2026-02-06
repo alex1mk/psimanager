@@ -8,7 +8,7 @@
 
 | Ambiente | URL |
 |----------|-----|
-| **Produção** | https://psimanager-by.vercel.app/ |
+| **Produção** | https://psimanager-bay.vercel.app/ |
 | **Repositório** | https://github.com/alex1mk/psimanager |
 | **Supabase Dashboard** | https://supabase.com/dashboard |
 
