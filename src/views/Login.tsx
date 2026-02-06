@@ -68,7 +68,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F1F5F9] flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
+    <div className="min-h-screen bg-bege-calmo flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
       <style>{`
         /* Hack to remove browser autofill background color */
         input:-webkit-autofill,
@@ -82,14 +82,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       `}</style>
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="w-16 h-16 bg-[#5B6D5B] rounded-2xl flex items-center justify-center shadow-lg transform -rotate-6">
-            <span className="text-white font-bold text-3xl">P</span>
+          <div className="w-16 h-16 bg-verde-botanico rounded-2xl flex items-center justify-center shadow-lg transform -rotate-6">
+            <span className="text-bege-calmo font-handwriting text-3xl">P</span>
           </div>
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-[#5B6D5B] tracking-tight">
+        <h2 className="mt-6 text-center text-4xl font-display text-verde-botanico tracking-tight">
           PsiManager
         </h2>
-        <p className="mt-2 text-center text-sm text-verde-botanico">
+        <p className="mt-2 text-center text-lg text-verde-botanico/80 font-handwriting">
           Gestão Clínica Inteligente & Humanizada
         </p>
       </div>

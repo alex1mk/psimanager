@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Playwrite+NZ:wght@100..400&display=swap');
 @config "../tailwind.config.js";
 
 @layer base {
@@ -85,7 +85,9 @@
   textarea,
   button,
   .rbc-calendar {
-    font-family: 'Inter', sans-serif !important;
+    font-family: 'Playwrite NZ', cursive !important;
+    font-weight: 300;
+    /* Leveza característica da escrita */
   }
 
   body {
@@ -116,7 +118,8 @@
 
   --font-display: "Playfair Display", serif;
   --font-serif: "Playfair Display", serif;
-  --font-sans: "Inter", sans-serif;
+  --font-sans: "Playwrite NZ", cursive;
+  --font-handwriting: "Playwrite NZ", cursive;
 }
 
 @layer utilities {

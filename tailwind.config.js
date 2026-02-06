@@ -50,6 +50,7 @@ export default {
                 sans: ['Inter', 'sans-serif'],
                 serif: ['Playfair Display', 'serif'],
                 display: ['Playfair Display', 'serif'],
+                handwriting: ['"Playwrite NZ"', 'cursive'],
             },
             borderRadius: {
                 lg: "var(--radius)",
