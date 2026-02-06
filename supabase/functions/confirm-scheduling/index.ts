@@ -140,12 +140,6 @@ serve(async (req) => {
       }
     }
 
-    const whatsappResult = await sendWhatsAppConfirmation(patient.name, patient.phone, nextDate, startTime);
-    if (whatsappResult.success) {
-      console.log("[Sync] ✅ WhatsApp enviado! SID:", whatsappResult.sid);
-    } else {
-      console.error("[Sync] ❌ WhatsApp falhou:", whatsappResult.error);
-    }
 
     const [year, month, day] = nextDate.split("-");
     const formattedDate = `${day}/${month}/${year}`;
@@ -220,7 +214,7 @@ serve(async (req) => {
       <p><strong>📅 Data:</strong> ${formattedDate}</p>
       <p><strong>🕐 Horário:</strong> ${startTime}</p>
     </div>
-    <p>Uma confirmação também foi enviada para seu WhatsApp.</p>
+    <p>Agradecemos a sua confirmação!</p>
     <p><strong>Obrigado, ${patient.name}!</strong></p>
   </div>
 </body>
@@ -367,37 +361,4 @@ async function addToGoogleCalendar(
     console.error("[Google Calendar] ❌ Erro:", errorMsg);
     return { success: false, error: errorMsg };
   }
-}
-
-// ─── MODIFICAÇÃO: Removida dependência do Twilio ───────────────────────────
-// Motivo: Limpeza de código obsoleto - Twilio descontinuado
-// Impacto: WhatsApp agora é placeholder para futura integração n8n
-// Data: 2026-02-06
-// ────────────────────────────────────────────────────────────────────────────
-
-async function sendWhatsAppConfirmation(
-  name: string,
-  phone: string,
-  date: string,
-  time: string
-): Promise<{ success: boolean; sid?: string; error?: string }> {
-  // TODO: Integrar via n8n webhook quando configurado
-  // Webhook URL esperada: Deno.env.get("N8N_WHATSAPP_WEBHOOK")
-  
-  const [year, month, day] = date.split("-");
-  const formattedDate = `${day}/${month}/${year}`;
-
-  console.log("[WhatsApp] 📋 Notificação pendente (n8n não configurado):");
-  console.log("[WhatsApp] → Paciente:", name);
-  console.log("[WhatsApp] → Telefone:", phone);
-  console.log("[WhatsApp] → Data:", formattedDate);
-  console.log("[WhatsApp] → Horário:", time);
-  console.log("[WhatsApp] ⏳ Aguardando configuração do webhook n8n...");
-
-  // Retorna sucesso silencioso para não bloquear o fluxo
-  return { 
-    success: true, 
-    sid: "placeholder-awaiting-n8n",
-    error: undefined 
-  };
 }
