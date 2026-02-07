@@ -146,7 +146,7 @@ export default function PreScheduleModal({
         setErrors([]);
 
         try {
-            // 0. Atualizar dados financeiros do paciente (Path B)
+            // 1. Atualizar dados financeiros do paciente
             if (formData.patient_id) {
                 const { error: updateError } = await supabase
                     .from('patients')
@@ -158,11 +158,10 @@ export default function PreScheduleModal({
 
                 if (updateError) {
                     console.warn('[PreScheduleModal] Erro ao atualizar paciente:', updateError);
-                    // Não bloqueamos o fluxo, mas logamos
                 }
             }
 
-            // 1. Criar agendamento com status pending_confirmation
+            // 2. Criar agendamento via Engine (já cria com status pending_confirmation)
             const createResult = await AppointmentEngine.createAppointment(
                 {
                     patient_id: formData.patient_id,
@@ -181,21 +180,20 @@ export default function PreScheduleModal({
 
             const appointmentId = createResult.appointment.id;
 
-            // 2. Gerar token de confirmação
+            // 3. Gerar token de confirmação
             const tokenResult = await AppointmentEngine.generateConfirmationToken(appointmentId);
 
             if (!tokenResult.success) {
                 throw new Error(tokenResult.error || 'Erro ao gerar link de confirmação');
             }
 
-            // 3. Enviar e-mail automático
-            await sendConfirmationEmail(
-                createResult.appointment,
-                tokenResult.tokenData!.link
-            );
+            const link = tokenResult.tokenData!.link;
 
-            // 4. Exibir sucesso com link
-            setConfirmationLink(tokenResult.tokenData!.link);
+            // 4. Enviar e-mail automático via Edge Function CORRETA
+            await sendConfirmationEmail(appointmentId, link);
+
+            // 5. Exibir sucesso com o link gerado pelo Engine
+            setConfirmationLink(link);
             setStep('success');
 
         } catch (error) {
@@ -209,40 +207,39 @@ export default function PreScheduleModal({
         }
     };
 
-    const sendConfirmationEmail = async (appointment: any, link: string) => {
-        const patient = patients.find(p => p.id === appointment.patient_id);
-        if (!patient?.email) {
-            console.warn('[PreScheduleModal] Falha: Paciente sem e-mail cadastrado.');
-            return;
-        }
-
+    const sendConfirmationEmail = async (appointmentId: string, confirmationLink: string) => {
         try {
-            console.log(`[PreScheduleModal] Chamando Edge Function para ${patient.email}`);
-            const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-confirmation-email`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY!,
-                },
-                body: JSON.stringify({
-                    email: patient.email,
-                    name: patient.name,
-                    date: appointment.scheduled_date,
-                    time: appointment.scheduled_time,
-                    link: link,
-                }),
-            });
+            console.log(`[PreScheduleModal] Enviando e-mail para appointment ${appointmentId}`);
+
+            const response = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-confirmation-email`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY!,
+                        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY!}`
+                    },
+                    body: JSON.stringify({
+                        appointment_id: appointmentId,
+                        confirmation_link: confirmationLink
+                    }),
+                }
+            );
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || 'Erro desconhecido na Edge Function');
+                throw new Error(errorData.error || 'Erro ao enviar e-mail');
             }
 
             console.log('[PreScheduleModal] E-mail enviado com sucesso via Edge Function');
         } catch (error) {
             console.error('[PreScheduleModal] Erro ao enviar e-mail:', error);
-            // Notificamos opcionalmente ou deixamos passar já que o WhatsApp é backup
-            setErrors(prev => [...prev, { field: 'general', message: 'Agendamento criado, mas houve uma falha ao enviar o e-mail de confirmação. Use o WhatsApp.' }]);
+            // Backup: WhatsApp
+            setErrors(prev => [...prev, {
+                field: 'general',
+                message: 'Agendamento criado, mas houve falha no envio do e-mail. Use o WhatsApp.'
+            }]);
         }
     };
 
