@@ -206,9 +206,12 @@ export default function PreScheduleModal({
         }
     };
 
-    const sendConfirmationEmail = async (appointmentId: string, confirmationLink: string) => {
+    const sendConfirmationEmail = async (appointmentId: string, confirmationLink?: string) => {
         try {
             console.log(`[PreScheduleModal] Enviando e-mail para appointment ${appointmentId}`);
+
+            const payload: any = { appointment_id: appointmentId };
+            if (confirmationLink) payload.confirmation_link = confirmationLink;
 
             const response = await fetch(
                 `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-confirmation-email`,
@@ -219,10 +222,7 @@ export default function PreScheduleModal({
                         'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY!,
                         'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY!}`
                     },
-                    body: JSON.stringify({
-                        appointment_id: appointmentId,
-                        confirmation_link: confirmationLink
-                    }),
+                    body: JSON.stringify(payload),
                 }
             );
 
