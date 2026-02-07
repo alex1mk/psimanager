@@ -6,11 +6,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { JWT } from "npm:google-auth-library@9.0.0";
 import { google } from "npm:googleapis@126.0.0";
-
-const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { supabase, corsHeaders } from "@shared/supabaseClient.ts";
 
 serve(async (req) => {
     // 1. Preflight CORS

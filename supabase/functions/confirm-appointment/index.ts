@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { JWT } from "npm:google-auth-library@9.0.0";
 import { google } from "npm:googleapis@126.0.0";
-import { supabase, corsHeaders } from "../_shared/supabaseClient.ts";
+import { supabase, corsHeaders } from "@shared/supabaseClient.ts";
 
 serve(async (req) => {
     // Handle CORS preflight
@@ -10,9 +10,21 @@ serve(async (req) => {
     }
 
     try {
-        const body = await req.json();
+        interface RequestBody {
+            token?: string;
+            date?: string;
+            time?: string;
+            recurrence?: string;
+            payment_method?: string;
+            payment_due_day?: number;
+            additional_email?: string;
+            additional_phone?: string;
+            preview?: boolean;
+        }
+
+        const body: RequestBody = await req.json();
         const {
-            token,
+            token: rawToken,
             date,
             time,
             recurrence,
@@ -20,8 +32,10 @@ serve(async (req) => {
             payment_due_day,
             additional_email,
             additional_phone,
-            preview // Novo: apenas para carregar dados iniciais
+            preview
         } = body;
+
+        const token: string | undefined = rawToken?.trim();
 
         if (!token) {
             return new Response(

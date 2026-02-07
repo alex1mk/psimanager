@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { supabase, corsHeaders } from "../_shared/supabaseClient.ts";
+import { supabase, corsHeaders } from "@shared/supabaseClient.ts";
 
 serve(async (req) => {
     const corsHeaders = {

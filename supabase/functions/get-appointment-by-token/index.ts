@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { supabase, corsHeaders } from "../_shared/supabaseClient.ts";
+import { supabase, corsHeaders } from "@shared/supabaseClient.ts";
 
 serve(async (req) => {
     if (req.method === "OPTIONS") {
@@ -7,11 +7,8 @@ serve(async (req) => {
     }
 
     try {
-        const body = await req.json();
-        let { token } = body;
-
-        // Limpeza de String (Senior Guard)
-        token = token?.trim();
+        const body: { token?: string } = await req.json();
+        const token: string | undefined = body.token?.trim();
 
         console.log(`[get-appointment-by-token] Processando token: "${token}"`);
 
