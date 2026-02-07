@@ -46,7 +46,17 @@ serve(async (req) => {
         }
 
         if (!tokenData) {
-            console.warn(`[get-appointment-by-token] Token não encontrado no banco: "${token}"`);
+            console.warn(`[get-appointment-by-token] Token não encontrado no banco: "${token}" (Length: ${token?.length})`);
+
+            // DIAGNÓSTICO SENIOR: Listar últimos tokens para conferir formato
+            const { data: lastTokens } = await supabase
+                .from("confirmation_tokens")
+                .select("token")
+                .order("created_at", { ascending: false })
+                .limit(5);
+
+            console.log("[DIAGNÓSTICO] Últimos 5 tokens no banco:", lastTokens?.map(t => `"${t.token}" (Len: ${t.token.length})`).join(", "));
+
             return new Response(JSON.stringify({ error: "Link de confirmação inválido." }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
