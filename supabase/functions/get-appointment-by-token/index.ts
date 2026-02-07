@@ -1,19 +1,5 @@
-// ─── EDGE FUNCTION: GET APPOINTMENT BY TOKEN ────────────────────────────────
-// Purpose: Validates token and returns appointment data for public confirmation
-// Created: 2026-02-06
-// ────────────────────────────────────────────────────────────────────────────
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { supabase, corsHeaders } from "../_shared/supabaseClient.ts";
 
 serve(async (req) => {
     if (req.method === "OPTIONS") {
@@ -24,16 +10,21 @@ serve(async (req) => {
         const body = await req.json();
         let { token } = body;
 
-        // 1. Limpeza de String (Senior Guard)
+        // Limpeza de String (Senior Guard)
         token = token?.trim();
 
-        console.log(`[get-appointment-by-token] Token recebido: "${token}"`);
+        console.log(`[get-appointment-by-token] Processando token: "${token}"`);
 
         if (!token) {
-            return new Response(JSON.stringify({ error: "Token não fornecido" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            console.error("[get-appointment-by-token] Token não fornecido na requisição");
+            return new Response(
+                JSON.stringify({ error: "Token não fornecido" }),
+                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
         }
 
-        // 1. Buscar Token no Banco
+        // 1. Buscar o registro do Token na tabela confirmation_tokens
+        // O campo 'token' nesta tabela é o UUID que enviamos no link.
         const { data: tokenData, error: tokenError } = await supabase
             .from("confirmation_tokens")
             .select("*")
@@ -41,75 +32,90 @@ serve(async (req) => {
             .maybeSingle();
 
         if (tokenError) {
-            console.error(`[DB ERROR]: ${tokenError.message}`);
-            throw new Error(`Erro ao buscar token: ${tokenError.message}`);
+            console.error(`[ERRO BANCO]: ${tokenError.message}`);
+            throw new Error(`Erro ao buscar registro do token: ${tokenError.message}`);
         }
 
         if (!tokenData) {
-            console.warn(`[get-appointment-by-token] Token não encontrado no banco: "${token}" (Length: ${token?.length})`);
-
-            // DIAGNÓSTICO SENIOR: Listar últimos tokens para conferir formato
-            const { data: lastTokens } = await supabase
-                .from("confirmation_tokens")
-                .select("token")
-                .order("created_at", { ascending: false })
-                .limit(5);
-
-            console.log("[DIAGNÓSTICO] Últimos 5 tokens no banco:", lastTokens?.map(t => `"${t.token}" (Len: ${t.token.length})`).join(", "));
-
-            return new Response(JSON.stringify({ error: "Link de confirmação inválido." }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            console.warn(`[get-appointment-by-token] Token não encontrado ou inválido: "${token}"`);
+            return new Response(
+                JSON.stringify({ error: "Link de confirmação inválido ou não encontrado." }),
+                { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
         }
 
         const serverTime = new Date().toISOString();
-        console.log(`[get-appointment-by-token] Token encontrado: ${tokenData.token.substring(0, 10)}...`);
-        console.log(`[get-appointment-by-token] Expira em: ${tokenData.expires_at} | Hora Servidor: ${serverTime}`);
-        console.log(`[get-appointment-by-token] Usado em: ${tokenData.used_at || 'Nunca'}`);
+        console.log(`[get-appointment-by-token] Registro encontrado para ID: ${tokenData.id}`);
 
         // 2. Validar Expiração e Uso
         if (new Date(tokenData.expires_at) < new Date()) {
-            console.warn(`[get-appointment-by-token] Link expirado. DB: ${tokenData.expires_at} < NOW: ${serverTime}`);
-            return new Response(JSON.stringify({ error: "Este link de confirmação expirou." }), { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        }
-        if (tokenData.used_at) {
-            return new Response(JSON.stringify({ error: "Este agendamento já foi confirmado." }), { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            console.warn(`[get-appointment-by-token] Link expirado. Expiração: ${tokenData.expires_at} | Agora: ${serverTime}`);
+            return new Response(
+                JSON.stringify({ error: "Este link de confirmação expirou." }),
+                { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
         }
 
-        // 3. Buscar Agendamento
+        if (tokenData.used_at) {
+            console.warn(`[get-appointment-by-token] Tentativa de usar token já utilizado: ${token}`);
+            return new Response(
+                JSON.stringify({ error: "Este agendamento já foi confirmado anteriormente." }),
+                { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
+
+        // 3. Buscar Agendamento Associado
         const { data: appointment, error: appError } = await supabase
             .from("appointments")
-            .select("*")
+            .select("*, patient_id")
             .eq("id", tokenData.appointment_id)
             .maybeSingle();
 
-        if (appError) throw new Error(`Erro ao buscar agendamento: ${appError.message}`);
+        if (appError) {
+            console.error(`[ERRO AGENDAMENTO]: ${appError.message}`);
+            throw new Error(`Erro ao buscar dados do agendamento: ${appError.message}`);
+        }
 
-        // 4. Buscar Paciente
+        if (!appointment) {
+            console.error(`[get-appointment-by-token] Agendamento ${tokenData.appointment_id} não encontrado para o token ${token}`);
+            return new Response(
+                JSON.stringify({ error: "Agendamento associado não encontrado." }),
+                { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
+
+        // 4. Buscar Nome do Paciente
         let patientName = "Paciente";
-        if (appointment?.patient_id) {
+        if (appointment.patient_id) {
             const { data: patient } = await supabase
                 .from("patients")
                 .select("name")
                 .eq("id", appointment.patient_id)
                 .maybeSingle();
-            if (patient) patientName = patient.name;
+
+            if (patient) {
+                patientName = patient.name;
+            }
         }
+
+        console.log(`[get-appointment-by-token] Sucesso ao recuperar dados para: ${patientName}`);
 
         return new Response(
             JSON.stringify({
                 appointment: {
                     patient_name: patientName,
-                    suggested_date: appointment?.scheduled_date,
-                    suggested_time: appointment?.scheduled_time,
+                    suggested_date: appointment.scheduled_date,
+                    suggested_time: appointment.scheduled_time,
                 },
             }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
 
     } catch (error) {
-        console.error("[get-appointment-by-token] FATAL:", error);
+        console.error("[get-appointment-by-token] ERRO CRÍTICO:", error);
         return new Response(
             JSON.stringify({
-                error: "Erro interno",
+                error: "Erro interno no servidor",
                 details: error.message
             }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -3,7 +3,8 @@
 // Purpose: Allows patients to confirm their appointments via link
 // ────────────────────────────────────────────────────────────────────────────
 
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
 import { Calendar, Clock, User, AlertCircle, CheckCircle, CreditCard, Mail, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -49,41 +50,40 @@ export default function PublicConfirmation() {
 
     const loadAppointmentData = async (token: string, patient_id?: string | null) => {
         try {
-            console.log(`[PublicConfirmation] Iniciando busca para Token: ${token?.substring(0, 10)}..., PatientID: ${patient_id}`);
+            console.log(`[PublicConfirmation] Buscando Token: ${token?.substring(0, 10)}...`);
 
             const response = await fetch(
-                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/confirm-appointment`,
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-appointment-by-token`,
                 {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-                        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
                     },
-                    body: JSON.stringify({ token, patient_id, preview: true }),
+                    body: JSON.stringify({ token }),
                 }
             );
 
+            // Log completo da resposta
+            console.log('[PublicConfirmation] Status:', response.status);
+
             const data = await response.json();
-            console.log('[PublicConfirmation] Resposta do servidor:', data);
+            console.log('[PublicConfirmation] Data:', data);
 
             if (!response.ok) {
-                if (response.status === 404 || response.status === 410) { // Combined 404 and 410 for a generic "invalid/expired" message
-                    setError('Link de confirmação inválido ou expirado.');
-                    return;
-                }
-                // Mostrar o erro detalhado do servidor se houver
-                setError(data.error || 'Erro ao carregar dados do agendamento.');
-                if (data.details) {
-                    console.error('Detalhes do erro no servidor:', data.details);
+                // Tratamento específico por código de erro
+                if (response.status === 404) {
+                    setError('Link de confirmação não encontrado. Verifique se o link está correto.');
+                } else if (response.status === 410) {
+                    setError(data.error || 'Este link expirou ou já foi utilizado.');
+                } else {
+                    setError(data.error || 'Erro ao carregar dados do agendamento.');
                 }
                 return;
             }
 
             setAppointmentData(data.appointment);
-            console.log(`[PublicConfirmation] Dados carregados. Status de uso: ${data.appointment.used_at || 'Disponível'}`);
 
-            // Preencher campos se vier pré-agendado
             if (data.appointment.suggested_date) {
                 setSelectedDate(data.appointment.suggested_date);
             }
@@ -92,8 +92,8 @@ export default function PublicConfirmation() {
             }
 
         } catch (err) {
-            console.error(err);
-            setError(err instanceof Error ? err.message : 'Erro desconhecido');
+            console.error('[PublicConfirmation] Exception:', err);
+            setError(err instanceof Error ? err.message : 'Erro de conexão com o servidor');
         } finally {
             setLoading(false);
         }

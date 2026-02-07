@@ -1,24 +1,10 @@
-// ─── EDGE FUNCTION: CONFIRM APPOINTMENT ─────────────────────────────────────
-// Purpose: Confirms an appointment with user-provided details (date, time, recurrence)
-// Created: 2026-02-06
-// Updated: 2026-02-07 (Added Detailed Logging)
-// ────────────────────────────────────────────────────────────────────────────
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { JWT } from "npm:google-auth-library@9.0.0";
 import { google } from "npm:googleapis@126.0.0";
-
-const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { supabase, corsHeaders } from "../_shared/supabaseClient.ts";
 
 serve(async (req) => {
+    // Handle CORS preflight
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }
@@ -37,72 +23,77 @@ serve(async (req) => {
             preview // Novo: apenas para carregar dados iniciais
         } = body;
 
-        console.log(`[confirm-appointment] Iniciando ${preview ? 'PREVIEW' : 'CONFIRMAÇÃO'} para o token: ${token?.substring(0, 10)}...`);
+        if (!token) {
+            return new Response(
+                JSON.stringify({ error: "Token é obrigatório" }),
+                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
+
+        console.log(`[confirm-appointment] Processando ${preview ? 'PREVIEW' : 'CONFIRMAÇÃO'} para token: "${token?.substring(0, 10)}..." (Length: ${token?.length})`);
 
         // 1. Validar token
+        const cleanToken = token?.trim();
         const { data: tokenData, error: tokenError } = await supabase
             .from("confirmation_tokens")
             .select("*")
-            .eq("token", token?.trim())
+            .eq("token", cleanToken)
             .maybeSingle();
 
-        if (tokenError) throw new Error(`Erro ao buscar token: ${tokenError.message}`);
+        if (tokenError || !tokenData) {
+            console.error(`[confirm-appointment] ❌ Token NÃO ENCONTRADO no banco: "${cleanToken}"`);
 
-        if (!tokenData) {
-            console.error(`[confirm-appointment] ❌ Token NÃO ENCONTRADO no banco.`);
-            console.error(`[confirm-appointment] Recebido: "${token}" (Length: ${token?.length})`);
-
-            // Log extra debugging info
-            const { count, error: countError } = await supabase
-                .from("confirmation_tokens")
-                .select("*", { count: 'exact', head: true });
-
-            console.log(`[DEBUG] Total de tokens no banco: ${count || 0}`);
-
+            // DIAGNÓSTICO: Buscar qualquer token para ver se a tabela está acessível e ver o formato
+            const { data: anyToken } = await supabase.from("confirmation_tokens").select("token").limit(1);
+            if (anyToken && anyToken.length > 0) {
+                console.log(`[DEBUG] Token de exemplo no DB: "${anyToken[0].token}" (Length: ${anyToken[0].token.length})`);
+            } else {
+                console.log("[DEBUG] Tabela confirmation_tokens parece estar vazia ou inacessível.");
+            }
             return new Response(
-                JSON.stringify({
-                    error: "Link de confirmação inválido ou já utilizado.",
-                    debug: { received_length: token?.length }
-                }),
+                JSON.stringify({ error: "Link de confirmação inválido ou expirado" }),
                 { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
-        console.log(`[confirm-appointment] Status do token no DB: ${tokenData.used_at ? 'Já usado' : 'Disponível'}`);
+        // 2. Verificar se já foi usado (bloqueia confirmação, mas permite preview com aviso)
+        if (tokenData.used_at && !preview) {
+            return new Response(
+                JSON.stringify({ error: "Este link já foi utilizado anteriormente" }),
+                { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
 
+        // 3. Verificar expiração
         if (new Date(tokenData.expires_at) < new Date()) {
-            console.warn(`[confirm-appointment] Link expirado. DB: ${tokenData.expires_at} < NOW: ${new Date().toISOString()}`);
-            return new Response(JSON.stringify({ error: "Este link expirou." }), { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            console.warn(`[confirm-appointment] Link expirado: ${tokenData.expires_at}`);
+            return new Response(
+                JSON.stringify({ error: "Este link de confirmação expirou" }),
+                { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
         }
 
-        if (tokenData.used_at) {
-            return new Response(JSON.stringify({ error: "Agendamento já confirmado." }), { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        }
-
-        const targetAppointmentId = tokenData.appointment_id;
-
-        // 2. Buscar Agendamento e Paciente de forma isolada (Resilience Protocol)
+        // 4. Buscar agendamento e paciente
         const { data: appointment, error: appError } = await supabase
             .from("appointments")
-            .select("*")
-            .eq("id", targetAppointmentId)
+            .select(`
+                *,
+                patient:patients(*)
+            `)
+            .eq("id", tokenData.appointment_id)
             .maybeSingle();
 
-        if (appError || !appointment) throw new Error("Agendamento não encontrado.");
+        if (appError || !appointment) {
+            console.error("[confirm-appointment] Agendamento não encontrado:", appError);
+            throw new Error("Agendamento não encontrado.");
+        }
 
-        const { data: patientDetails, error: patientError } = await supabase
-            .from("patients")
-            .select("*")
-            .eq("id", appointment.patient_id)
-            .maybeSingle();
+        const patientDetails = appointment.patient;
 
-        if (patientError || !patientDetails) throw new Error("Dados do paciente não encontrados.");
-
-        // 3. Se for apenas PREVIEW, retornar dados aqui
+        // 5. Se for apenas PREVIEW, retornar dados aqui
         if (preview) {
             return new Response(
                 JSON.stringify({
-                    success: true,
                     appointment: {
                         patient_name: patientDetails.name,
                         suggested_date: appointment.scheduled_date,
@@ -114,50 +105,39 @@ serve(async (req) => {
             );
         }
 
-        // 4. Validar conflito de horário
+        // 6. Validar conflito de horário
         const { data: conflicts } = await supabase
             .from("appointments")
             .select("id")
             .eq("scheduled_date", date)
             .eq("scheduled_time", time)
             .neq("status", "cancelled")
-            .neq("id", targetAppointmentId);
+            .neq("id", appointment.id);
 
         if (conflicts && conflicts.length > 0) {
-            console.warn(`[confirm-appointment] Conflito detectado para ${date} ${time}`);
             return new Response(
                 JSON.stringify({ error: "Horário já está ocupado. Por favor, escolha outro." }),
                 { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
-        // 4. Atualizar Dados do Paciente (Pagamento e Contatos)
-        console.log(`[confirm-appointment] Atualizando dados do paciente ${patientDetails.id}`);
+        // 7. Atualizar Dados do Paciente
         const patientUpdates: any = {};
         if (payment_method) patientUpdates.payment_method = payment_method;
         if (payment_due_day) patientUpdates.payment_due_day = payment_due_day;
 
-        if (additional_email) {
-            const existingEmails = patientDetails.additional_emails || [];
-            if (!existingEmails.includes(additional_email)) {
-                patientUpdates.additional_emails = [...existingEmails, additional_email];
-            }
+        if (additional_email && !patientDetails.additional_emails?.includes(additional_email)) {
+            patientUpdates.additional_emails = [...(patientDetails.additional_emails || []), additional_email];
         }
-        if (additional_phone) {
-            const existingPhones = patientDetails.additional_phones || [];
-            if (!existingPhones.includes(additional_phone)) {
-                patientUpdates.additional_phones = [...existingPhones, additional_phone];
-            }
+        if (additional_phone && !patientDetails.additional_phones?.includes(additional_phone)) {
+            patientUpdates.additional_phones = [...(patientDetails.additional_phones || []), additional_phone];
         }
 
         if (Object.keys(patientUpdates).length > 0) {
-            await supabase
-                .from("patients")
-                .update(patientUpdates)
-                .eq("id", patientDetails.id);
+            await supabase.from("patients").update(patientUpdates).eq("id", patientDetails.id);
         }
 
-        // 5. Atualizar Agendamento
+        // 8. Atualizar Agendamento
         const { error: updateError } = await supabase
             .from("appointments")
             .update({
@@ -166,62 +146,39 @@ serve(async (req) => {
                 recurrence_type: recurrence,
                 status: "confirmed",
             })
-            .eq("id", targetAppointmentId);
+            .eq("id", appointment.id);
 
         if (updateError) throw updateError;
 
-        // 6. Marcar token como usado
+        // 9. Marcar token como usado
         await supabase
             .from("confirmation_tokens")
             .update({ used_at: new Date().toISOString() })
-            .eq("token", token?.trim());
+            .eq("token", token.trim());
 
-        // 7. Sincronizar com Google Calendar (Try/Catch Isolado para evitar travamentos)
-        console.log("[confirm-appointment] Iniciando sync com Google Calendar...");
+        // 10. Sync Google Calendar
         try {
-            const calendarResult = await syncGoogleCalendar(
-                patientDetails.name,
-                date,
-                time,
-                recurrence,
-                patientDetails.email
-            );
-
+            const calendarResult = await syncGoogleCalendar(patientDetails.name, date, time, recurrence, patientDetails.email);
             if (calendarResult.success) {
-                console.log(`[confirm-appointment] Google Event ID gerado: ${calendarResult.eventId}`);
-                await supabase
-                    .from("appointments")
-                    .update({ google_event_id: calendarResult.eventId })
-                    .eq("id", targetAppointmentId);
+                await supabase.from("appointments").update({ google_event_id: calendarResult.eventId }).eq("id", appointment.id);
             }
         } catch (calErr) {
-            console.error("[confirm-appointment] Erro (não crítico) no Google Calendar:", calErr);
+            console.error("[confirm-appointment] Erro não-crítico Calendar:", calErr);
         }
 
-        // 8. Enviar e-mail de confirmação
+        // 11. Email de Sucesso
         try {
-            await sendSuccessEmail(
-                patientDetails.email,
-                patientDetails.name,
-                date,
-                time
-            );
+            await sendSuccessEmail(patientDetails.email, patientDetails.name, date, time);
         } catch (emailErr) {
-            console.error("[confirm-appointment] Erro ao enviar email de sucesso:", emailErr);
+            console.error("[confirm-appointment] Erro envio email sucesso:", emailErr);
         }
 
-        return new Response(
-            JSON.stringify({ success: true }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ success: true }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     } catch (error: any) {
-        console.error("[FATAL ERROR]:", error);
+        console.error("[confirm-appointment] Erro Fatal:", error);
         return new Response(
-            JSON.stringify({
-                error: "Erro interno ao confirmar agendamento",
-                details: error.message
-            }),
+            JSON.stringify({ error: error.message || "Erro interno ao confirmar agendamento" }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }

@@ -1,11 +1,6 @@
-// ─── MODIFICAÇÃO: Removida dependência do Twilio ───────────────────────────
-// Motivo: Limpeza de código obsoleto - Twilio descontinuado
-// Impacto: Apenas email é enviado; WhatsApp será via n8n no futuro
-// Data: 2026-02-06
-// ────────────────────────────────────────────────────────────────────────────
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
+import { supabase, corsHeaders } from "../_shared/supabaseClient.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 

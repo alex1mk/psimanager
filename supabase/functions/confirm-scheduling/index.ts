@@ -1,26 +1,16 @@
-// ─── EDGE FUNCTION: CONFIRM SCHEDULING (LEGACY REDIRECT) ─────────────────────
-// Purpose: Redirects old links to the new Public Confirmation Portal
-// Created: 2026-02-06
-// ────────────────────────────────────────────────────────────────────────────
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase, corsHeaders } from "../_shared/supabaseClient.ts";
 
 serve(async (req) => {
-  const portalUrl = "https://psimanager-bay.vercel.app/confirmar";
-
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-  };
+  const portalUrl = "https://psimanager.vercel.app/confirmar";
 
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", {
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Allow-Methods": "GET, OPTIONS"
+      }
+    });
   }
 
   const url = new URL(req.url);
@@ -28,14 +18,15 @@ serve(async (req) => {
   const token = url.searchParams.get("token");
 
   if (!patientId || !token) {
+    console.warn("[Redirect] Parâmetros insuficientes para redirecionamento");
     return new Response(JSON.stringify({ error: "Parâmetros inválidos." }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  console.log(`[Redirect] Legacy link for patient ${patientId} -> Portal`);
-  const redirectUrl = `${portalUrl}?token=${token}&patient_id=${patientId}`;
+  console.log(`[Redirect] Link legado para paciente ${patientId} -> Redirecionando para o Portal`);
+  const redirectUrl = `${portalUrl}?token=${token}`;
 
   return Response.redirect(redirectUrl, 302);
 });

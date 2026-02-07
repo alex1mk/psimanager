@@ -1,21 +1,7 @@
-// ─── EDGE FUNCTION: SEND CONFIRMATION EMAIL ──────────────────────────────────
-// Purpose: Triggered by frontend after appointment creation to send the confirmation link.
-// Created: 2026-02-07
-// ────────────────────────────────────────────────────────────────────────────
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { supabase, corsHeaders } from "../_shared/supabaseClient.ts";
 
-const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const resendApiKey = Deno.env.get("RESEND_API_KEY");
-
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 serve(async (req) => {
     if (req.method === "OPTIONS") {
@@ -28,12 +14,13 @@ serve(async (req) => {
         let { confirmation_link } = body;
 
         if (!appointment_id) {
-            throw new Error("appointment_id is required");
+            console.error("[send-confirmation-email] ID do agendamento não fornecido");
+            throw new Error("O ID do agendamento é obrigatório");
         }
 
-        console.log(`[send-confirmation-email] Processing for appointment: ${appointment_id}`);
+        console.log(`[send-confirmation-email] Processando para agendamento: ${appointment_id}`);
 
-        // 1. Fetch Appointment and Patient
+        // 1. Buscar Agendamento e Paciente
         const { data: appointment, error: appError } = await supabase
             .from("appointments")
             .select(`
@@ -44,13 +31,13 @@ serve(async (req) => {
             .single();
 
         if (appError || !appointment) {
-            console.error("Error fetching appointment:", appError);
-            throw new Error("Appointment not found");
+            console.error(`[ERRO BANCO]: ${appError?.message}`);
+            throw new Error("Agendamento não encontrado");
         }
 
-        // 2. Resolve Confirmation Link if missing
+        // 2. Resolver Link de Confirmação se estiver faltando
         if (!confirmation_link) {
-            console.log("[send-confirmation-email] Link missing, searching in database...");
+            console.log("[send-confirmation-email] Link ausente, buscando token no banco...");
             const { data: tokenData, error: tokenError } = await supabase
                 .from("confirmation_tokens")
                 .select("token")
@@ -60,40 +47,42 @@ serve(async (req) => {
                 .maybeSingle();
 
             if (tokenError || !tokenData) {
-                console.error("Token not found in DB:", tokenError);
-                throw new Error("Confirmation token not found for this appointment.");
+                console.error("[send-confirmation-email] Token não encontrado para este agendamento");
+                throw new Error("Token de confirmação não encontrado para este agendamento.");
             }
 
-            const origin = req.headers.get("origin") || "https://psimanager-bay.vercel.app";
-            confirmation_link = `${origin}/confirmar?token=${tokenData.token}&patient_id=${appointment.patient_id}`;
-            console.log(`[send-confirmation-email] Link resolved from DB: ${confirmation_link}`);
+            const origin = req.headers.get("origin") || "https://psimanager.vercel.app";
+            // Foco total no Token UUID como solicitado
+            confirmation_link = `${origin}/confirmar?token=${tokenData.token}`;
+            console.log(`[send-confirmation-email] Link gerado com sucesso: ${confirmation_link}`);
         }
 
         const patientEmail = appointment.patient?.email;
         const patientName = appointment.patient?.name;
 
         if (!patientEmail) {
-            throw new Error("Patient email not found");
+            console.error("[send-confirmation-email] Email do paciente não encontrado");
+            throw new Error("Email do paciente não encontrado");
         }
 
-        console.log(`[send-confirmation-email] Final destination: ${patientEmail}`);
-
         if (!resendApiKey) {
-            console.warn("[WARNING] RESEND_API_KEY not configured.");
+            console.warn("[AVISO] RESEND_API_KEY não configurada.");
             return new Response(
-                JSON.stringify({ success: false, message: "Resend API Key missing" }),
+                JSON.stringify({ success: false, message: "API Key do Resend ausente" }),
                 { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
-        // 2. Format Date
+        // 2. Formatar Data para o e-mail
         const dateFormatted = new Date(appointment.scheduled_date).toLocaleDateString('pt-BR', {
             day: '2-digit',
             month: 'long',
             year: 'numeric'
         });
 
-        // 3. Send Email via Resend
+        console.log(`[send-confirmation-email] Enviando e-mail para: ${patientEmail}`);
+
+        // 3. Enviar E-mail via Resend
         const emailResponse = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: {
@@ -128,8 +117,11 @@ serve(async (req) => {
         const emailData = await emailResponse.json();
 
         if (!emailResponse.ok) {
-            throw new Error(`Resend API Error: ${emailData.message || emailResponse.statusText}`);
+            console.error(`[ERRO RESEND]: ${emailData.message}`);
+            throw new Error(`Erro na API do Resend: ${emailData.message || emailResponse.statusText}`);
         }
+
+        console.log(`[send-confirmation-email] E-mail enviado com sucesso. ID: ${emailData.id}`);
 
         return new Response(
             JSON.stringify({ success: true, id: emailData.id }),
@@ -137,7 +129,7 @@ serve(async (req) => {
         );
 
     } catch (error: any) {
-        console.error("[FATAL ERROR]:", error);
+        console.error("[send-confirmation-email] ERRO CRÍTICO:", error);
         return new Response(
             JSON.stringify({ error: error.message || "Erro desconhecido" }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
