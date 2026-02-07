@@ -33,10 +33,11 @@ serve(async (req) => {
             payment_method,
             payment_due_day,
             additional_email,
-            additional_phone
+            additional_phone,
+            preview // Novo: apenas para carregar dados iniciais
         } = body;
 
-        console.log(`[confirm-appointment] Iniciando confirmação DEFINITIVA para o token: ${token?.substring(0, 10)}...`);
+        console.log(`[confirm-appointment] Iniciando ${preview ? 'PREVIEW' : 'CONFIRMAÇÃO'} para o token: ${token?.substring(0, 10)}...`);
 
         // 1. Validar token
         const { data: tokenData, error: tokenError } = await supabase
@@ -85,7 +86,23 @@ serve(async (req) => {
 
         if (patientError || !patientDetails) throw new Error("Dados do paciente não encontrados.");
 
-        // 3. Validar conflito de horário
+        // 3. Se for apenas PREVIEW, retornar dados aqui
+        if (preview) {
+            return new Response(
+                JSON.stringify({
+                    success: true,
+                    appointment: {
+                        patient_name: patientDetails.name,
+                        suggested_date: appointment.scheduled_date,
+                        suggested_time: appointment.scheduled_time,
+                        used_at: tokenData.used_at
+                    }
+                }),
+                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
+
+        // 4. Validar conflito de horário
         const { data: conflicts } = await supabase
             .from("appointments")
             .select("id")

@@ -52,7 +52,7 @@ export default function PublicConfirmation() {
             console.log(`[PublicConfirmation] Iniciando busca para Token: ${token?.substring(0, 10)}..., PatientID: ${patient_id}`);
 
             const response = await fetch(
-                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-appointment-by-token`,
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/confirm-appointment`,
                 {
                     method: 'POST',
                     headers: {
@@ -60,7 +60,7 @@ export default function PublicConfirmation() {
                         'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
                         'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
                     },
-                    body: JSON.stringify({ token, patient_id }),
+                    body: JSON.stringify({ token, patient_id, preview: true }),
                 }
             );
 
