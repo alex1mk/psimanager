@@ -89,10 +89,10 @@ export default function PublicConfirmation() {
                 setSelectedTime(data.appointment.suggested_time);
             }
 
-            setLoading(false);
         } catch (err) {
             console.error(err);
             setError(err instanceof Error ? err.message : 'Erro desconhecido');
+        } finally {
             setLoading(false);
         }
     };
