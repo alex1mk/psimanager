@@ -180,20 +180,19 @@ export default function PreScheduleModal({
 
             const appointmentId = createResult.appointment.id;
 
-            // 3. Gerar token de confirmação
-            const tokenResult = await AppointmentEngine.generateConfirmationToken(appointmentId);
+            // 3. Enviar e-mail automático via Edge Function (Autônoma)
+            // Chamamos a função apenas com o ID. Ela mesma buscará o token do banco.
+            await sendConfirmationEmail(appointmentId);
 
-            if (!tokenResult.success) {
-                throw new Error(tokenResult.error || 'Erro ao gerar link de confirmação');
+            // 4. Recuperar o link do banco para exibir na tela (WhatsApp backup)
+            const linkResult = await AppointmentEngine.getConfirmationLink(appointmentId);
+
+            if (linkResult.success && linkResult.link) {
+                setConfirmationLink(linkResult.link);
+            } else {
+                console.warn('[PreScheduleModal] Link não recuperado para exibição, mas e-mail foi disparado.');
             }
 
-            const link = tokenResult.tokenData!.link;
-
-            // 4. Enviar e-mail automático via Edge Function CORRETA
-            await sendConfirmationEmail(appointmentId, link);
-
-            // 5. Exibir sucesso com o link gerado pelo Engine
-            setConfirmationLink(link);
             setStep('success');
 
         } catch (error) {

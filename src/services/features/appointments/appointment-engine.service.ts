@@ -250,47 +250,36 @@ export class AppointmentEngine {
     }
 
     /**
-     * GERAÇÃO DE TOKEN: Cria link de confirmação
+     * RECUPERAÇÃO DE TOKEN: Busca o link de confirmação gerado pelo banco
      */
-    static async generateConfirmationToken(
+    static async getConfirmationLink(
         appointmentId: string
-    ): Promise<{ success: boolean; tokenData?: ConfirmationToken; error?: string }> {
+    ): Promise<{ success: boolean; link?: string; error?: string }> {
         try {
-            // 1. Gerar token único
-            const token = crypto.randomUUID();
+            // Aguardar um pequeno delay para garantir que o trigger do banco processou
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // 2. Calcular expiração (24h)
-            const expiresAt = new Date();
-            expiresAt.setHours(expiresAt.getHours() + 24);
-
-            // 3. Salvar no banco
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('confirmation_tokens')
-                .insert({
-                    appointment_id: appointmentId,
-                    token: token,
-                    expires_at: expiresAt.toISOString(),
-                });
+                .select('*')
+                .eq('appointment_id', appointmentId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
 
             if (error) throw error;
+            if (!data) throw new Error('Token ainda não gerado pelo sistema.');
 
-            // 4. Gerar link (Vercel Portal)
-            const appUrl = "https://psimanager-bay.vercel.app";
-            const link = `${appUrl}/confirmar?token=${token}`;
-
-            console.log('[AppointmentEngine] ✅ Token gerado:', token);
+            const appUrl = window.location.origin;
+            const link = `${appUrl}/confirmar?token=${data.token}&patient_id=${data.appointment_id}`;
 
             return {
                 success: true,
-                tokenData: {
-                    token,
-                    expires_at: expiresAt.toISOString(),
-                    link,
-                },
+                link
             };
 
         } catch (error) {
-            console.error('[AppointmentEngine] ❌ Erro ao gerar token:', error);
+            console.error('[AppointmentEngine] ❌ Erro ao recuperar link:', error);
             return {
                 success: false,
                 error: error instanceof Error ? error.message : 'Erro desconhecido',

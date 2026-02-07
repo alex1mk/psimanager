@@ -23,10 +23,12 @@ serve(async (req) => {
     }
 
     try {
-        const { appointment_id, confirmation_link } = await req.json();
+        const body = await req.json();
+        const { appointment_id } = body;
+        let { confirmation_link } = body;
 
-        if (!appointment_id || !confirmation_link) {
-            throw new Error("appointment_id and confirmation_link are required");
+        if (!appointment_id) {
+            throw new Error("appointment_id is required");
         }
 
         console.log(`[send-confirmation-email] Processing for appointment: ${appointment_id}`);
@@ -46,6 +48,27 @@ serve(async (req) => {
             throw new Error("Appointment not found");
         }
 
+        // 2. Resolve Confirmation Link if missing
+        if (!confirmation_link) {
+            console.log("[send-confirmation-email] Link missing, searching in database...");
+            const { data: tokenData, error: tokenError } = await supabase
+                .from("confirmation_tokens")
+                .select("token")
+                .eq("appointment_id", appointment_id)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (tokenError || !tokenData) {
+                console.error("Token not found in DB:", tokenError);
+                throw new Error("Confirmation token not found for this appointment.");
+            }
+
+            const origin = req.headers.get("origin") || "https://psimanager-bay.vercel.app";
+            confirmation_link = `${origin}/confirmar?token=${tokenData.token}&patient_id=${appointment.patient_id}`;
+            console.log(`[send-confirmation-email] Link resolved from DB: ${confirmation_link}`);
+        }
+
         const patientEmail = appointment.patient?.email;
         const patientName = appointment.patient?.name;
 
@@ -53,11 +76,10 @@ serve(async (req) => {
             throw new Error("Patient email not found");
         }
 
-        console.log(`[send-confirmation-email] Sending to: ${patientEmail}`);
-        console.log(`[send-confirmation-email] Link: ${confirmation_link}`);
+        console.log(`[send-confirmation-email] Final destination: ${patientEmail}`);
 
         if (!resendApiKey) {
-            console.warn("[WARNING] RESEND_API_KEY not configured. Email will not be sent.");
+            console.warn("[WARNING] RESEND_API_KEY not configured.");
             return new Response(
                 JSON.stringify({ success: false, message: "Resend API Key missing" }),
                 { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
