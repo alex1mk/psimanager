@@ -56,6 +56,12 @@ export class AppointmentService extends BaseService {
 
         if (error) this.handleError(error);
 
+        // Trigger confirmation email if status is pending_confirmation
+        if (data.status === 'pending_confirmation') {
+            // Fire and forget - don't block the UI for email sending
+            this.sendConfirmationEmail(data.id);
+        }
+
         return {
             id: data.id,
             patientId: data.patient_id,
@@ -67,6 +73,21 @@ export class AppointmentService extends BaseService {
             source: data.source,
             googleId: data.google_id
         };
+    }
+
+    /**
+     * Trigger the confirmation email for a specific appointment
+     * This is separated to allow retries if needed
+     */
+    async sendConfirmationEmail(appointmentId: string): Promise<void> {
+        const { error } = await this.supabase.functions.invoke('send-confirmation-email', {
+            body: { appointment_id: appointmentId }
+        });
+
+        if (error) {
+            console.error('Failed to trigger confirmation email:', error);
+            // We don't throw here to avoid blocking UI, but we log it
+        }
     }
 
     async update(appointment: Appointment): Promise<Appointment> {

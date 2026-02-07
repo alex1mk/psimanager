@@ -49,28 +49,37 @@ export default function PublicConfirmation() {
 
     const loadAppointmentData = async (token: string, patient_id?: string | null) => {
         try {
+            console.log(`[PublicConfirmation] Iniciando busca para Token: ${token?.substring(0, 10)}..., PatientID: ${patient_id}`);
+
             const response = await fetch(
                 `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-appointment-by-token`,
                 {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
                     body: JSON.stringify({ token, patient_id }),
                 }
             );
 
             const data = await response.json();
+            console.log('[PublicConfirmation] Resposta do servidor:', data);
 
             if (!response.ok) {
-                if (response.status === 410) {
-                    throw new Error('Link de confirmação expirado ou já utilizado. Por favor, entre em contato com o consultório para solicitar um novo.');
+                if (response.status === 404 || response.status === 410) { // Combined 404 and 410 for a generic "invalid/expired" message
+                    setError('Link de confirmação inválido ou expirado.');
+                    return;
                 }
-                if (response.status === 404) {
-                    throw new Error('Agendamento não encontrado. Verifique se o link está correto.');
+                // Mostrar o erro detalhado do servidor se houver
+                setError(data.error || 'Erro ao carregar dados do agendamento.');
+                if (data.details) {
+                    console.error('Detalhes do erro no servidor:', data.details);
                 }
-                throw new Error(data.error || 'Erro ao carregar dados do agendamento.');
+                return;
             }
 
             setAppointmentData(data.appointment);
+            console.log(`[PublicConfirmation] Dados carregados. Status de uso: ${data.appointment.used_at || 'Disponível'}`);
 
             // Preencher campos se vier pré-agendado
             if (data.appointment.suggested_date) {
@@ -89,6 +98,7 @@ export default function PublicConfirmation() {
     };
 
     const handleConfirm = async () => {
+        if (loading) return; // Proteção contra duplo clique (Race Condition)
         if (!selectedDate || !selectedTime || !paymentMethod || !paymentDueDay) {
             setError('Por favor, preencha todos os campos obrigatórios (Data, Horário e Pagamento)');
             return;
@@ -136,10 +146,10 @@ export default function PublicConfirmation() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4 font-sans">
                 <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Carregando...</p>
+                    <p className="mt-4 text-gray-600 font-sans">Carregando...</p>
                 </div>
             </div>
         );
@@ -147,16 +157,16 @@ export default function PublicConfirmation() {
 
     if (success) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4 font-sans">
                 <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
                     <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <CheckCircle className="w-10 h-10 text-green-600" />
                     </div>
-                    <h1 className="text-2xl font-bold text-gray-800 mb-2">
-                        Muito obrigado por confirmar sua presença!
+                    <h1 className="text-2xl font-bold text-gray-800 mb-2 font-sans">
+                        Obrigado pela confirmação! 🎉
                     </h1>
-                    <p className="text-gray-600 mb-4">
-                        Você receberá um e-mail de confirmação em breve.
+                    <p className="text-gray-600 mb-4 font-sans">
+                        Seu agendamento foi atualizado com sucesso em nosso sistema.
                     </p>
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left">
                         <p className="text-sm text-gray-700">
@@ -184,15 +194,15 @@ export default function PublicConfirmation() {
 
     if (error && !appointmentData) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4 font-sans">
                 <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
                     <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <AlertCircle className="w-10 h-10 text-red-600" />
                     </div>
-                    <h1 className="text-2xl font-bold text-gray-800 mb-2">
+                    <h1 className="text-2xl font-bold text-gray-800 mb-2 font-sans">
                         Link Inválido
                     </h1>
-                    <p className="text-gray-600">
+                    <p className="text-gray-600 font-sans">
                         {error}
                     </p>
                 </div>
@@ -201,9 +211,9 @@ export default function PublicConfirmation() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4 font-sans">
             <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full font-sans">
-                <h1 className="text-3xl font-bold text-verde-botanico mb-4 font-sans">
+                <h1 className="text-3xl font-bold text-verde-botanico mb-4 font-sans text-center">
                     Confirmar Agendamento
                 </h1>
 

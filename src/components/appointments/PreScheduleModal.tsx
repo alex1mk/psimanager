@@ -276,14 +276,14 @@ Aguardo sua confirmação! 💚`;
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 font-sans">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto font-sans">
 
                 {step === 'form' ? (
                     <>
                         {/* Header */}
-                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                            <h2 className="text-xl font-bold text-gray-800">
+                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between font-sans">
+                            <h2 className="text-xl font-bold text-gray-800 font-sans">
                                 Novo Pré-Agendamento
                             </h2>
                             <button
@@ -311,7 +311,7 @@ Aguardo sua confirmação! 💚`;
 
                             {/* Paciente */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-2 font-sans">
                                     <User className="w-4 h-4 inline mr-2" />
                                     Paciente *
                                 </label>
@@ -487,10 +487,10 @@ Aguardo sua confirmação! 💚`;
                                         <CheckCircle className="w-7 h-7 text-green-600" />
                                     </div>
                                     <div>
-                                        <h2 className="text-xl font-bold text-gray-800">
+                                        <h2 className="text-xl font-bold text-gray-800 font-sans">
                                             Pré-Agendamento Criado!
                                         </h2>
-                                        <p className="text-sm text-gray-600">
+                                        <p className="text-sm text-gray-600 font-sans">
                                             E-mail de confirmação enviado
                                         </p>
                                     </div>

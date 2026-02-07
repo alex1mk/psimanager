@@ -1,203 +1,153 @@
-// ─── SENIOR EDGE FUNCTION: SEND CONFIRMATION EMAIL ──────────────────────────
-// Rigor Técnico: Padrões de Clean Code, Otimização e Segurança.
-// Propósito: Disparo de e-mail de confirmação via Resend API.
-// Versão: 2.0.0 (Skill-Hard-Senior)
+// ─── EDGE FUNCTION: SEND CONFIRMATION EMAIL ──────────────────────────────────
+// Purpose: Triggered by frontend after appointment creation to send the confirmation link.
+// Created: 2026-02-07
 // ────────────────────────────────────────────────────────────────────────────
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const resendApiKey = Deno.env.get("RESEND_API_KEY");
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  try {
-    const { email, name, date, time, link } = await req.json();
-
-    // 1. Validação Crítica de Payload
-    if (!email || !name || !date || !time || !link) {
-      return new Response(
-        JSON.stringify({ error: "Dados obrigatórios ausentes no payload" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Handle CORS preflight request
+    if (req.method === "OPTIONS") {
+        return new Response("ok", { headers: corsHeaders });
     }
 
-    // 2. Validação de Segurança: Environment Variables
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
+    try {
+        const { appointment_id } = await req.json();
 
-    if (!resendApiKey) {
-      console.error("[CRITICAL] Resend API Key não configurada no ambiente Supabase");
-      return new Response(
-        JSON.stringify({ error: "Serviço de e-mail temporariamente indisponível (Secret missing)" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+        if (!appointment_id) {
+            throw new Error("appointment_id is required");
+        }
 
-    // 3. Formatação Robusta de Data
-    // Assume-se formato YYYY-MM-DD vindo do input type="date"
-    const [year, month, day] = date.split("-");
-    const formattedDate = `${day}/${month}/${year}`;
+        console.log(`[send-confirmation-email] Processing for appointment: ${appointment_id}`);
 
-    console.log(`[Senior-Log] Iniciando disparo para: ${email} (Agendamento: ${formattedDate} ${time})`);
+        // 1. Fetch Appointment, Patient and Token
+        const { data: appointment, error: appError } = await supabase
+            .from("appointments")
+            .select(`
+                *,
+                patient:patients(name, email),
+                token:confirmation_tokens(token)
+            `)
+            .eq("id", appointment_id)
+            .single();
 
-    // 4. Envio via Fetch (Otimizado: Evita dependências pesadas de SDK se não necessário)
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${resendApiKey}`,
-      },
-      body: JSON.stringify({
-        from: "PsiManager <onboarding@resend.dev>", // Usando onboarding para sandbox, alterar em prod real
-        to: [email],
-        subject: `✨ Confirmação de Agendamento: ${name}`,
-        html: `
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 0;
-      background-color: #f4f7f6;
-    }
-    .main-container {
-      background: #ffffff;
-      border-radius: 12px;
-      margin: 40px auto;
-      padding: 32px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-      border: 1px solid #e5e7eb;
-    }
-    .header {
-      text-align: center;
-      margin-bottom: 32px;
-    }
-    .header h1 {
-      color: #166534;
-      margin: 0 0 8px 0;
-      font-size: 24px;
-      font-weight: 700;
-    }
-    .header p {
-      color: #6b7280;
-      margin: 0;
-      font-size: 16px;
-    }
-    .appointment-box {
-      background: #f0fdf4;
-      border-left: 4px solid #10b981;
-      padding: 24px;
-      margin: 32px 0;
-      border-radius: 8px;
-    }
-    .appointment-box p {
-      margin: 12px 0;
-      font-size: 16px;
-      color: #374151;
-    }
-    .appointment-box strong {
-      color: #166534;
-    }
-    .cta-button {
-      display: block;
-      background-color: #10b981;
-      color: #ffffff !important;
-      text-align: center;
-      padding: 16px 32px;
-      text-decoration: none;
-      border-radius: 10px;
-      font-weight: 700;
-      font-size: 16px;
-      margin: 32px 0;
-      transition: background 0.3s ease;
-    }
-    .footer {
-      text-align: center;
-      margin-top: 40px;
-      padding-top: 24px;
-      border-top: 1px solid #f1f5f9;
-      color: #94a3b8;
-      font-size: 13px;
-    }
-    .link-fallback {
-      font-size: 11px;
-      color: #94a3b8;
-      word-break: break-all;
-      margin-top: 24px;
-      text-align: center;
-      padding: 0 20px;
-    }
-  </style>
-</head>
-<body>
-  <div class="main-container">
-    <div class="header">
-      <h1>✨ Confirme seu Agendamento</h1>
-      <p>Olá, <strong>${name}</strong>!</p>
-    </div>
-    
-    <p style="text-align: center;">Recebemos uma solicitação de agendamento para você. Por favor, valide os detalhes abaixo:</p>
-    
-    <div class="appointment-box">
-      <p><strong>📅 Data:</strong> ${formattedDate}</p>
-      <p><strong>🕐 Horário:</strong> ${time}</p>
-    </div>
-    
-    <p style="text-align: center; font-weight: 500;">Para garantir seu horário, clique no botão abaixo:</p>
-    
-    <a href="${link}" class="cta-button">
-      Confirmar Minha Presença
-    </a>
-    
-    <div class="footer">
-      <p>Sistema PsiManager - Cuidado e Acolhimento</p>
-      <p>Se você não reconhece este agendamento, por favor ignore este e-mail.</p>
-    </div>
-    
-    <div class="link-fallback">
-      Caso o botão não funcione, utilize o link: ${link}
-    </div>
-  </div>
-</body>
-</html>
-        `,
-      }),
-    });
+        if (appError || !appointment) {
+            console.error("Error fetching appointment:", appError);
+            throw new Error("Appointment not found");
+        }
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("[ERROR] Falha na API Resend:", errorData);
-      throw new Error(errorData.message || "Erro de comunicação com provedor de e-mail");
+        const patientEmail = appointment.patient?.email;
+        const patientName = appointment.patient?.name;
+        // The token is now in a separate table, linked by appointment_id. 
+        // Note: The query above assumes a 1:1 relationship or takes the first one. 
+        // If query fails to get token via join implies 1:1 relation setup in DB or need separate query.
+        // Let's safe-guard by fetching token specifically if the join didn't work as expected or if multiple exist.
+
+        let token = appointment.token?.token;
+        if (!token) {
+            const { data: tokenData } = await supabase
+                .from("confirmation_tokens")
+                .select("token")
+                .eq("appointment_id", appointment_id)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .single();
+            token = tokenData?.token;
+        }
+
+        if (!token) {
+            console.error("Token not found for appointment", appointment_id);
+            throw new Error("Confirmation token not generated yet");
+        }
+
+        // 2. Prepare Email Content
+        const patientId = appointment.patient_id;
+        const origin = req.headers.get("origin") || "https://psimanager-bay.vercel.app";
+        const confirmationLink = `${origin}/confirmar?token=${token}&patient_id=${patientId}`;
+
+        console.log(`[send-confirmation-email] Sending to: ${patientEmail}`);
+        console.log(`[send-confirmation-email] Link: ${confirmationLink}`);
+
+        if (!resendApiKey) {
+            console.warn("[WARNING] RESEND_API_KEY not configured. Email will not be sent.");
+            return new Response(
+                JSON.stringify({ success: false, message: "Resend API Key missing" }),
+                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
+
+        // 3. Send Email via Resend
+        const emailResponse = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${resendApiKey}`,
+            },
+            body: JSON.stringify({
+                from: "PsiManager <noreply@psimanager.com>", // Make sure verify domain or use 'onboarding@resend.dev' for sandbox
+                to: [patientEmail],
+                subject: "Confirme seu Agendamento - PsiManager",
+                html: `
+                    <div style="font-family: sans-serif; color: #333;">
+                        <h1>Olá, ${patientName}!</h1>
+                        <p>Seu agendamento foi pré-reservado. Para confirmar, por favor clique no botão abaixo:</p>
+                        <a href="${confirmationLink}" style="display: inline-block; padding: 12px 24px; background-color: #5B6D5B; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                            Confirmar Agendamento
+                        </a>
+                        <p style="margin-top: 20px; font-size: 12px; color: #666;">
+                            Se o botão não funcionar, copie e cole este link: ${confirmationLink}
+                        </p>
+                    </div>
+                `,
+            }),
+        });
+
+        const emailData = await emailResponse.json();
+
+        // 4. Handle Resend Errors (Sandbox vs Critical)
+        if (!emailResponse.ok) {
+            console.error("[Resend Error Payload]:", emailData);
+
+            // Check for Sandbox restriction (403 Forbidden usually)
+            if (emailResponse.status === 403 && emailData.message?.includes("domain is not verified")) {
+                console.warn("[RESEND SANDBOX] Email not sent because domain is not verified. Valid in dev mode.");
+                return new Response(
+                    JSON.stringify({
+                        success: true,
+                        warning: "Sandbox Mode: Email not sent to unverified address.",
+                        mockLink: confirmationLink // Return link for dev testing
+                    }),
+                    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+            }
+
+            throw new Error(`Resend API Error: ${emailData.message || emailResponse.statusText}`);
+        }
+
+        console.log("[send-confirmation-email] Email sent successfully:", emailData.id);
+
+        return new Response(
+            JSON.stringify({ success: true, id: emailData.id }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+
+    } catch (error: any) {
+        console.error("[FATAL ERROR]:", error);
+        return new Response(
+            JSON.stringify({ error: error.message || "Erro desconhecido" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
     }
-
-    const data = await response.json();
-    console.log("✅ [Senior-Log] E-mail enviado com sucesso. ID:", data.id);
-
-    return new Response(
-      JSON.stringify({ success: true, id: data.id }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (error) {
-    console.error("❌ [EXCEPTION] send-confirmation-email:", error);
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : "Erro crítico interno ao processar e-mail",
-        context: "Edge Function Runtime"
-      }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
 });
