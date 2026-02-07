@@ -22,28 +22,42 @@ serve(async (req) => {
 
     try {
         const body = await req.json();
-        const { token } = body;
+        let { token } = body;
 
-        console.log(`[get-appointment-by-token] Analisando token: ${token?.substring(0, 10)}...`);
+        // 1. Limpeza de String (Senior Guard)
+        token = token?.trim();
+
+        console.log(`[get-appointment-by-token] Token recebido: "${token}"`);
 
         if (!token) {
             return new Response(JSON.stringify({ error: "Token não fornecido" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
-        // 1. Buscar Token
+        // 1. Buscar Token no Banco
         const { data: tokenData, error: tokenError } = await supabase
             .from("confirmation_tokens")
             .select("*")
             .eq("token", token)
             .maybeSingle();
 
-        if (tokenError) throw new Error(`Erro ao buscar token: ${tokenError.message}`);
-        if (!tokenData) return new Response(JSON.stringify({ error: "Link de confirmação inválido." }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (tokenError) {
+            console.error(`[DB ERROR]: ${tokenError.message}`);
+            throw new Error(`Erro ao buscar token: ${tokenError.message}`);
+        }
 
-        console.log(`[get-appointment-by-token] Token encontrado. Usado em: ${tokenData.used_at || 'Nunca'}`);
+        if (!tokenData) {
+            console.warn(`[get-appointment-by-token] Token não encontrado no banco: "${token}"`);
+            return new Response(JSON.stringify({ error: "Link de confirmação inválido." }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
 
-        // 2. Validar Expiração
+        const serverTime = new Date().toISOString();
+        console.log(`[get-appointment-by-token] Token encontrado: ${tokenData.token.substring(0, 10)}...`);
+        console.log(`[get-appointment-by-token] Expira em: ${tokenData.expires_at} | Hora Servidor: ${serverTime}`);
+        console.log(`[get-appointment-by-token] Usado em: ${tokenData.used_at || 'Nunca'}`);
+
+        // 2. Validar Expiração e Uso
         if (new Date(tokenData.expires_at) < new Date()) {
+            console.warn(`[get-appointment-by-token] Link expirado. DB: ${tokenData.expires_at} < NOW: ${serverTime}`);
             return new Response(JSON.stringify({ error: "Este link de confirmação expirou." }), { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
         if (tokenData.used_at) {

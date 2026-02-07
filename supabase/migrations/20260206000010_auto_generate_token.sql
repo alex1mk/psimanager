@@ -27,7 +27,7 @@ BEGIN
         ) VALUES (
             NEW.id,
             new_token,
-            now() + interval '7 days' -- Token valid for 7 days
+            now() + interval '30 days' -- Token valid for 30 days
         );
     END IF;
     

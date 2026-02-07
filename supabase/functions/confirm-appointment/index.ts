@@ -36,27 +36,30 @@ serve(async (req) => {
             additional_phone
         } = body;
 
-        console.log(`[confirm-appointment] Iniciando confirmação. Token: ${token?.substring(0, 10)}...`);
+        console.log(`[confirm-appointment] Iniciando confirmação DEFINITIVA para o token: ${token?.substring(0, 10)}...`);
 
         // 1. Validar token
         const { data: tokenData, error: tokenError } = await supabase
             .from("confirmation_tokens")
             .select("*")
-            .eq("token", token)
+            .eq("token", token?.trim())
             .maybeSingle();
 
         if (tokenError) throw new Error(`Erro ao buscar token: ${tokenError.message}`);
 
         if (!tokenData) {
-            console.error("[confirm-appointment] Token não encontrado.");
+            console.error(`[confirm-appointment] Token não encontrado no banco: "${token}"`);
             return new Response(
                 JSON.stringify({ error: "Link de confirmação inválido ou já utilizado." }),
                 { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
+        console.log(`[confirm-appointment] Status do token no DB: ${tokenData.used_at ? 'Já usado' : 'Disponível'}`);
+
         if (new Date(tokenData.expires_at) < new Date()) {
-            return new Response(JSON.stringify({ error: "Token expirado." }), { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            console.warn(`[confirm-appointment] Link expirado. DB: ${tokenData.expires_at} < NOW: ${new Date().toISOString()}`);
+            return new Response(JSON.stringify({ error: "Este link expirou." }), { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
         if (tokenData.used_at) {
@@ -65,7 +68,7 @@ serve(async (req) => {
 
         const targetAppointmentId = tokenData.appointment_id;
 
-        // 2. Buscar Agendamento (Isolado)
+        // 2. Buscar Agendamento e Paciente de forma isolada (Resilience Protocol)
         const { data: appointment, error: appError } = await supabase
             .from("appointments")
             .select("*")
@@ -74,7 +77,6 @@ serve(async (req) => {
 
         if (appError || !appointment) throw new Error("Agendamento não encontrado.");
 
-        // 3. Buscar Paciente (Isolado)
         const { data: patientDetails, error: patientError } = await supabase
             .from("patients")
             .select("*")
@@ -83,7 +85,7 @@ serve(async (req) => {
 
         if (patientError || !patientDetails) throw new Error("Dados do paciente não encontrados.");
 
-        // 2. Validar conflito de horário
+        // 3. Validar conflito de horário
         const { data: conflicts } = await supabase
             .from("appointments")
             .select("id")
@@ -100,7 +102,7 @@ serve(async (req) => {
             );
         }
 
-        // 3. Atualizar Dados do Paciente (Pagamento e Contatos)
+        // 4. Atualizar Dados do Paciente (Pagamento e Contatos)
         console.log(`[confirm-appointment] Atualizando dados do paciente ${patientDetails.id}`);
         const patientUpdates: any = {};
         if (payment_method) patientUpdates.payment_method = payment_method;
@@ -126,7 +128,7 @@ serve(async (req) => {
                 .eq("id", patientDetails.id);
         }
 
-        // 4. Atualizar Agendamento
+        // 5. Atualizar Agendamento
         const { error: updateError } = await supabase
             .from("appointments")
             .update({
@@ -139,36 +141,35 @@ serve(async (req) => {
 
         if (updateError) throw updateError;
 
-        // 5. Marcar token como usado
-        if (tokenData) {
-            await supabase
-                .from("confirmation_tokens")
-                .update({ used_at: new Date().toISOString() })
-                .eq("token", token);
-        }
+        // 6. Marcar token como usado
+        await supabase
+            .from("confirmation_tokens")
+            .update({ used_at: new Date().toISOString() })
+            .eq("token", token?.trim());
 
-        // 6. Sincronizar com Google Calendar
+        // 7. Sincronizar com Google Calendar (Try/Catch Isolado para evitar travamentos)
         console.log("[confirm-appointment] Iniciando sync com Google Calendar...");
-        const calendarResult = await syncGoogleCalendar(
-            patientDetails.name,
-            date,
-            time,
-            recurrence,
-            patientDetails.email // Passando email para tentar convidar
-        );
+        try {
+            const calendarResult = await syncGoogleCalendar(
+                patientDetails.name,
+                date,
+                time,
+                recurrence,
+                patientDetails.email
+            );
 
-        if (calendarResult.success) {
-            console.log(`[confirm-appointment] Google Event ID gerado: ${calendarResult.eventId}`);
-            await supabase
-                .from("appointments")
-                .update({ google_event_id: calendarResult.eventId })
-                .eq("id", targetAppointmentId);
-        } else {
-            console.error("[confirm-appointment] Falha no sync com Google Calendar.");
+            if (calendarResult.success) {
+                console.log(`[confirm-appointment] Google Event ID gerado: ${calendarResult.eventId}`);
+                await supabase
+                    .from("appointments")
+                    .update({ google_event_id: calendarResult.eventId })
+                    .eq("id", targetAppointmentId);
+            }
+        } catch (calErr) {
+            console.error("[confirm-appointment] Erro (não crítico) no Google Calendar:", calErr);
         }
 
-        // 7. Enviar e-mail de confirmação (sem await para não bloquear response se falhar na Vercel time limit)
-        // Mas como é Edge Function, melhor aguardar.
+        // 8. Enviar e-mail de confirmação
         try {
             await sendSuccessEmail(
                 patientDetails.email,
