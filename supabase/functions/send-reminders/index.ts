@@ -13,7 +13,10 @@ serve(async (req) => {
     }
 
     try {
-        const { type } = await req.json(); // "24h" ou "30min"
+        interface RequestBody {
+            type?: "24h" | "30min";
+        }
+        const { type }: RequestBody = await req.json();
 
         if (type === "24h") {
             await send24hReminders();
@@ -27,7 +30,7 @@ serve(async (req) => {
             JSON.stringify({ success: true, message: `Lembretes ${type} processados` }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
-    } catch (error) {
+    } catch (error: any) {
         console.error("Erro ao processar lembretes:", error);
         return new Response(
             JSON.stringify({ error: error.message }),
