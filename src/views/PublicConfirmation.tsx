@@ -57,6 +57,8 @@ export default function PublicConfirmation() {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
                     },
                     body: JSON.stringify({ token, patient_id }),
                 }
@@ -112,7 +114,11 @@ export default function PublicConfirmation() {
                 `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/confirm-appointment`,
                 {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                    },
                     body: JSON.stringify({
                         token,
                         patient_id: new URLSearchParams(window.location.search).get('patient_id'),
