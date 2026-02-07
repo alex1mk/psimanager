@@ -49,9 +49,21 @@ serve(async (req) => {
         if (tokenError) throw new Error(`Erro ao buscar token: ${tokenError.message}`);
 
         if (!tokenData) {
-            console.error(`[confirm-appointment] Token não encontrado no banco: "${token}"`);
+            console.error(`[confirm-appointment] ❌ Token NÃO ENCONTRADO no banco.`);
+            console.error(`[confirm-appointment] Recebido: "${token}" (Length: ${token?.length})`);
+
+            // Log extra debugging info
+            const { count, error: countError } = await supabase
+                .from("confirmation_tokens")
+                .select("*", { count: 'exact', head: true });
+
+            console.log(`[DEBUG] Total de tokens no banco: ${count || 0}`);
+
             return new Response(
-                JSON.stringify({ error: "Link de confirmação inválido ou já utilizado." }),
+                JSON.stringify({
+                    error: "Link de confirmação inválido ou já utilizado.",
+                    debug: { received_length: token?.length }
+                }),
                 { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
