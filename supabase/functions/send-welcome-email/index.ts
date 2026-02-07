@@ -33,15 +33,9 @@ serve(async (req) => {
     }
 
     const { id, name, email, phone } = payload.record;
-
-    // 1. Generate Link for the new Public Confirmation Portal (Vercel)
-    const appUrl = "https://psimanager-bay.vercel.app"; // URL principal do app
-
-    // Validar se já existe um token para este agendamento/paciente
-    // Nota: O trigger vem do INSERT do patient, mas o agendamento pode ainda não existir
-    // ou ser criado simultaneamente pelo frontend.
-
+    const appUrl = "https://psimanager-bay.vercel.app";
     const secret = Deno.env.get("CONFIRMATION_SECRET") || "your-secret-key-here";
+
     // Gerar HMAC para compatibilidade legada ou fallback
     const hmacToken = await crypto.subtle
       .digest("SHA-256", new TextEncoder().encode(`${id}:${secret}`))
@@ -51,15 +45,33 @@ serve(async (req) => {
           .join(""),
       );
 
-    // Link oficial apontando para o PORTAL (Frontend) e não mais para a Edge Function direta
-    const confirmLink = `${appUrl}/confirmar?token=${hmacToken}&patient_id=${id}`;
+    // 1. Resolver Link de Confirmação (Prioridade: UUID Token)
+    let confirmLink = `${appUrl}/confirmar?patient_id=${id}&token=${hmacToken}`;
+
+    try {
+      // Tentar buscar se já existe um token para este agendamento (caso o agendamento tenha sido criado segundos antes)
+      const { data: tokenData } = await supabase
+        .from("confirmation_tokens")
+        .select("token")
+        .eq("patient_id", id) // Assumindo que temos patient_id ou podemos buscar via appointment
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (tokenData?.token) {
+        confirmLink = `${appUrl}/confirmar?token=${tokenData.token}`;
+        console.log(`[send-welcome-email] Usando Token UUID real: ${tokenData.token}`);
+      }
+    } catch (e) {
+      console.warn("[send-welcome-email] Falha ao buscar UUID token real, usando fallback HMAC.");
+    }
 
     // 2. Determine Recipients (Test Mode Support)
     const adminEmail = Deno.env.get("ADMIN_EMAIL");
     const toEmail = adminEmail || email;
 
     console.log(`[Function] Sending Email to ${toEmail}`);
-    console.log(`[Link] Generated (Portal): ${confirmLink}`);
+    console.log(`[Link] Final Pattern: ${confirmLink}`);
 
     // 3. Send Email (Resend)
     const results: any = { email: null, whatsapp: null };
